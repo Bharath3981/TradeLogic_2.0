@@ -81,5 +81,25 @@ export const InstrumentRepository = {
                 tradingsymbol: symbol
             }
         });
+    },
+
+    async findUpcomingFutures(symbol: string) {
+        return await prisma.instrument.findMany({
+            where: {
+                name: { equals: symbol, mode: 'insensitive' },
+                instrument_type: 'FUT',
+                expiry: { gt: new Date() }
+            },
+            orderBy: { expiry: 'asc' },
+            select: {
+                instrument_token: true,
+                tradingsymbol: true,
+                expiry: true,
+                lot_size: true,
+                last_price: true,
+                segment: true,
+                exchange: true
+            }
+        });
     }
 };

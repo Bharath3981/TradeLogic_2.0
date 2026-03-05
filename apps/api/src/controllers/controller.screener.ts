@@ -4,6 +4,7 @@ import { sendSuccess } from '../utils/ApiResponse';
 import { AppError } from '../utils/AppError';
 import { ErrorCode } from '../constants';
 import { ScreenerService } from '../services/service.screener';
+import { InstrumentRepository } from '../repositories/repository.instrument';
 import { logger } from '../utils/logger';
 
 export const ScreenerController = {
@@ -37,6 +38,16 @@ export const ScreenerController = {
         try {
             const sectors = ScreenerService.getSectors();
             sendSuccess(res, sectors);
+        } catch (error) {
+            next(error);
+        }
+    },
+
+    async getUpcomingFutures(req: Request, res: Response, next: NextFunction) {
+        try {
+            const symbol = String(req.params.symbol);
+            const futures = await InstrumentRepository.findUpcomingFutures(symbol);
+            sendSuccess(res, futures);
         } catch (error) {
             next(error);
         }

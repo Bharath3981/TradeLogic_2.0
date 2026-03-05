@@ -51,7 +51,7 @@ app.use('/api/kite', authenticate, kiteRoutes); // /api/kite/login
 app.use('/api/instruments', authenticate, instrumentRoutes); // /api/instruments/sync/nfo
 app.use('/api/instruments', authenticate, instrumentRoutes); // /api/instruments/sync/nfo
 app.use('/api/strategies', authenticate, strategyRoutes);
-app.use('/api/screener',   authenticate, screenerRoutes);  // /api/screener/scan // /api/strategies/:id/run
+app.use('/api/screener',   screenerRoutes);
 
 // Error Handler
 import { globalErrorHandler } from './middleware/middleware.error';

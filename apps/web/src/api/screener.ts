@@ -55,6 +55,16 @@ export interface ScreenerResult {
     scanDurationMs: number;
 }
 
+export interface FuturesContract {
+    instrument_token: number;
+    tradingsymbol: string;
+    expiry: string;
+    lot_size: number | null;
+    last_price: number | null;
+    segment: string | null;
+    exchange: string | null;
+}
+
 export type { ScreenerScanOptions, ScreenerStockIndicators, ScreenerStock, ScreenerResult };
 
 export const screenerApi = {
@@ -62,4 +72,6 @@ export const screenerApi = {
         apiClient.post<{ success: boolean; data: ScreenerResult }>('/screener/scan', options),
     getSectors: () =>
         apiClient.get<{ success: boolean; data: string[] }>('/screener/sectors'),
+    getUpcomingFutures: (symbol: string) =>
+        apiClient.get<{ success: boolean; data: FuturesContract[] }>(`/screener/futures/${symbol}`),
 };
