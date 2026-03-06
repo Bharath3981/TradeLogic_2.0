@@ -1,34 +1,35 @@
-import { format, isSaturday, isSunday, parse } from 'date-fns';
-
 export const MarketUtils = {
     /**
      * Checks if the market is currently open.
-     * Market Hours: 09:15 - 15:30 IST
+     * Market Hours: 09:15 - 15:30 IST (UTC+5:30)
      * Markets are closed on Saturday and Sunday.
-     * Note: Does not currently check for specific market holidays.
+     * Note: Does not check for specific market holidays.
      */
     isMarketOpen(): boolean {
-        // 1. Check Weekend
-        const now = new Date();
-        if (isSaturday(now) || isSunday(now)) {
+        // Get current time in IST regardless of server timezone
+        const nowIST = new Date(
+            new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
+        );
+
+        const day = nowIST.getDay(); // 0 = Sunday, 6 = Saturday
+        if (day === 0 || day === 6) {
             return false;
         }
 
-        // 2. Check Time (09:15 - 15:30)
-        // Note: This logic assumes server time is in IST or we adjust accordingly.
-        // For local development on user's machine (mac), we use local time.
-        const currentTime = format(now, 'HH:mm');
-        const openTime = '09:15';
-        const closeTime = '15:30';
+        const hh = nowIST.getHours();
+        const mm = nowIST.getMinutes();
+        const totalMinutes = hh * 60 + mm;
 
-        return currentTime >= openTime && currentTime <= closeTime;
+        const openMinutes  = 9 * 60 + 15;  // 09:15
+        const closeMinutes = 15 * 60 + 30; // 15:30
+
+        return totalMinutes >= openMinutes && totalMinutes <= closeMinutes;
     },
 
     /**
-     * Mock helper to bypass market hours during testing if needed.
+     * Bypass market hours check during testing.
      */
     shouldBypassMarketHours(): boolean {
-        // Can be driven by environment variable
         return process.env.BYPASS_MARKET_HOURS === 'true';
     }
 };

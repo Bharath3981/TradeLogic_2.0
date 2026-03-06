@@ -6,8 +6,9 @@ class SocketManager {
   private socket: Socket | null = null;
   private subscribers: Map<string, (tick: Tick) => void> = new Map();
   private isConnected: boolean = false;
-
   private connectionListeners: Set<(connected: boolean) => void> = new Set();
+  private activeSubscriptions: Map<number, number> = new Map();
+  private currentToken: string | undefined;
 
   private constructor() {}
 
@@ -18,61 +19,48 @@ class SocketManager {
     return SocketManager.instance;
   }
 
-  // Track subscriptions with reference counting to handle multiple components asking for same token
-  private activeSubscriptions: Map<number, number> = new Map();
-  private currentToken: string | undefined;
-
   public connect(url: string = 'http://localhost:9000', token?: string): void {
     if (this.socket?.connected) {
-        if (this.currentToken === token) return; // Already connected with same token
-        
-        console.log('SocketManager: Token changed, reconnecting...');
-        this.disconnect(); // Disconnect to reconnect with new token
+        if (this.currentToken === token) return;
+        this.disconnect();
     }
 
-    this.currentToken = token; // Update current token
+    this.currentToken = token;
 
     this.socket = io(url, {
-      transports: ['websocket'], // Force websocket to avoid polling issues
+      transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      auth: {
-        token: token,
-        tradingMode: 'REAL'
-      },
-      extraHeaders: {
-        'x-trading-mode': 'REAL'
-      }
+      auth: { token, tradingMode: 'REAL' },
+      extraHeaders: { 'x-trading-mode': 'REAL' }
     });
 
     this.socket.on('connect', () => {
-      console.log('SocketConnected:', this.socket?.id);
       this.isConnected = true;
       this.notifyConnectionChange(true);
       this.resubscribeAll();
     });
 
     this.socket.on('disconnect', () => {
-      console.log('SocketDisconnected');
       this.isConnected = false;
       this.notifyConnectionChange(false);
     });
 
     this.socket.on('tick', (tick: Tick) => {
-      // console.log('SocketManager: Tick received:', tick); // Verbose logging (optional)
       this.subscribers.forEach((callback) => callback(tick));
     });
-    
+
     this.socket.on('connect_error', (err) => {
-      console.error('Socket connection error details:', { message: err.message, name: err.name, stack: err.stack });
+      if (import.meta.env.DEV) {
+        console.error('Socket connection error:', err.message);
+      }
     });
   }
 
   private resubscribeAll() {
       const tokens = Array.from(this.activeSubscriptions.keys());
       if (tokens.length > 0 && this.socket?.connected) {
-          console.log('Resubscribing to all active tokens:', tokens);
           this.socket.emit('subscribe', tokens);
       }
   }
@@ -83,7 +71,6 @@ class SocketManager {
 
   public onConnectionChange(listener: (connected: boolean) => void): () => void {
       this.connectionListeners.add(listener);
-      // Immediately notify current status
       listener(this.isConnected);
       return () => this.connectionListeners.delete(listener);
   }
@@ -93,36 +80,29 @@ class SocketManager {
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
-      this.isConnected = false;
       this.notifyConnectionChange(false);
-      this.activeSubscriptions.clear(); // Clear all subscriptions on disconnect
+      this.activeSubscriptions.clear();
     }
   }
 
   public subscribe(tokens: number[]): void {
     if (tokens.length === 0) return;
-    
+
     const tokensToSubscribe: number[] = [];
     tokens.forEach(token => {
         const count = this.activeSubscriptions.get(token) || 0;
-        if (count === 0) {
-            tokensToSubscribe.push(token);
-        }
+        if (count === 0) tokensToSubscribe.push(token);
         this.activeSubscriptions.set(token, count + 1);
     });
 
     if (tokensToSubscribe.length > 0 && this.socket?.connected) {
-        console.log('Subscribing to:', tokensToSubscribe);
         this.socket.emit('subscribe', tokensToSubscribe);
-    } else if (tokensToSubscribe.length > 0) {
-         console.log('Queuing subscription (socket not connected):', tokensToSubscribe);
-         // They will be picked up by resubscribeAll on connect
     }
   }
 
   public unsubscribe(tokens: number[]): void {
     if (tokens.length === 0) return;
-    
+
     const tokensToUnsubscribe: number[] = [];
     tokens.forEach(token => {
         const count = this.activeSubscriptions.get(token) || 0;
@@ -135,13 +115,10 @@ class SocketManager {
     });
 
     if (tokensToUnsubscribe.length > 0 && this.socket?.connected) {
-        console.log('Unsubscribing from:', tokensToUnsubscribe);
         this.socket.emit('unsubscribe', tokensToUnsubscribe);
     }
   }
 
-  // Simple subscription mechanism for components to listen to all ticks
-  // In a real app, you might filter by token for efficient updates
   public onTick(id: string, callback: (tick: Tick) => void): void {
     this.subscribers.set(id, callback);
   }

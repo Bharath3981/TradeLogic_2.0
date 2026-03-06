@@ -1,16 +1,22 @@
-
-import { Request, Response, NextFunction } from 'express';
-import { StrategyRunMode } from '@prisma/client';
+import type { Request, Response, NextFunction } from 'express';
+import type { StrategyRunMode } from '@prisma/client';
 import { AppError } from '../utils/AppError';
 import { ErrorCode } from '../constants';
 import { StrategyRunner } from '../services/runners/strategy.runner';
 import { StrategyRepository } from '../repositories/repository.strategy';
 import { StrategyRunRepository } from '../repositories/repository.strategy-run';
-
-// For MVP, single global runner instance
-const globalRunner = new StrategyRunner();
-
 import { getContext } from '../utils/http.context';
+import { sendSuccess } from '../utils/ApiResponse';
+
+// Per-user runner registry — each user gets at most one active runner
+const runnerRegistry = new Map<string, StrategyRunner>();
+
+const getOrCreateRunner = (userId: string): StrategyRunner => {
+    if (!runnerRegistry.has(userId)) {
+        runnerRegistry.set(userId, new StrategyRunner());
+    }
+    return runnerRegistry.get(userId)!;
+};
 
 export const startStrategyRun = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -21,16 +27,16 @@ export const startStrategyRun = async (req: Request, res: Response, next: NextFu
          throw new AppError(401, ErrorCode.AUTH_UNAUTHORIZED, 'User not authenticated');
     }
 
-    // Verify Strategy Exists
     const finalStrategy = await StrategyRepository.findByIdOrCode(id);
-    
+
     if (!finalStrategy) {
          throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'Strategy not found');
     }
-    
+
     const strategyId = finalStrategy.id;
-    
-    const runId = await globalRunner.startRun(strategyId, userId, mode as StrategyRunMode, accessToken);
+    const runner = getOrCreateRunner(userId);
+
+    const runId = await runner.startRun(strategyId, userId, mode as StrategyRunMode, accessToken);
 
     res.status(201).json({
       success: true,
@@ -43,7 +49,7 @@ export const startStrategyRun = async (req: Request, res: Response, next: NextFu
     });
   } catch (error: any) {
     if (error.message === 'Runner is already running') {
-        return next(new AppError(409, ErrorCode.RESOURCE_CONFLICT, 'Strategy runner is already active'));
+        return next(new AppError(409, ErrorCode.RESOURCE_CONFLICT, 'A strategy is already running for your account'));
     }
     next(error);
   }
@@ -51,18 +57,22 @@ export const startStrategyRun = async (req: Request, res: Response, next: NextFu
 
 export const stopStrategyRun = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { id } = req.params as { id: string }; // This is active runId
-        
-        const stopped = await globalRunner.stopRun(id);
-        
+        const { id } = req.params as { id: string };
+        const { userId } = getContext(req);
+
+        const runner = runnerRegistry.get(userId);
+
+        if (!runner) {
+            throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'No active runner found for your account');
+        }
+
+        const stopped = await runner.stopRun(id);
+
         if (!stopped) {
             throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'Run not found or not active');
         }
 
-        res.json({
-            success: true,
-            data: { message: `Run ${id} stopped` }
-        });
+        sendSuccess(res, { message: `Run ${id} stopped` });
     } catch (error) {
         next(error);
     }
@@ -71,11 +81,7 @@ export const stopStrategyRun = async (req: Request, res: Response, next: NextFun
 export const getStrategies = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const strategies = await StrategyRepository.findAll();
-
-    res.json({
-      success: true,
-      data: strategies
-    });
+    sendSuccess(res, strategies);
   } catch (error) {
     next(error);
   }
@@ -84,17 +90,14 @@ export const getStrategies = async (req: Request, res: Response, next: NextFunct
 export const getStrategyById = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params as { id: string };
-    
-    const strategy = await StrategyRepository.findByIdOrCodeWithDetails(id); // I need to add this method in repo
+
+    const strategy = await StrategyRepository.findByIdOrCodeWithDetails(id);
 
     if (!strategy) {
       throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'Strategy not found');
     }
 
-    res.json({
-      success: true,
-      data: strategy
-    });
+    sendSuccess(res, strategy);
   } catch (error) {
     next(error);
   }
@@ -104,21 +107,15 @@ export const clearHistory = async (req: Request, res: Response, next: NextFuncti
     try {
         const { id } = req.params as { id: string };
 
-        // Resolve Strategy ID
         const finalStrategy = await StrategyRepository.findByIdOrCode(id);
-        
+
         if (!finalStrategy) {
              throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'Strategy not found');
         }
-        
-        const strategyId = finalStrategy.id;
 
-        await StrategyRunRepository.clearHistoryForStrategy(strategyId);
+        await StrategyRunRepository.clearHistoryForStrategy(finalStrategy.id);
 
-        res.json({
-            success: true,
-            data: { message: `History cleared for strategy ${finalStrategy.code} (${strategyId})` }
-        });
+        sendSuccess(res, { message: `History cleared for strategy ${finalStrategy.code} (${finalStrategy.id})` });
     } catch (error) {
         next(error);
     }
@@ -128,19 +125,14 @@ export const deleteStrategy = async (req: Request, res: Response, next: NextFunc
     try {
         const { id } = req.params as { id: string };
 
-        // Check if exists
         const finalStrategy = await StrategyRepository.findByIdOrCode(id);
         if (!finalStrategy) {
              throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'Strategy not found');
         }
 
-        // Delete
         await StrategyRepository.delete(finalStrategy.id);
 
-        res.json({
-            success: true,
-            data: { message: `Strategy ${finalStrategy.code} (${finalStrategy.id}) and all associated data deleted.` }
-        });
+        sendSuccess(res, { message: `Strategy ${finalStrategy.code} (${finalStrategy.id}) and all associated data deleted.` });
     } catch (error) {
         next(error);
     }
@@ -151,26 +143,17 @@ export const getPositions = async (req: Request, res: Response, next: NextFuncti
         const strategyId = req.query.strategyId as string | undefined;
 
         if (strategyId) {
-            // Verify Strategy Exists if ID provided
             const finalStrategy = await StrategyRepository.findByIdOrCode(strategyId);
              if (!finalStrategy) {
                  throw new AppError(404, ErrorCode.RESOURCE_NOT_FOUND, 'Strategy not found');
             }
-            // Use resolved ID (in case code was passed)
             const positions = await StrategyRunRepository.getPositionsByStrategy(finalStrategy.id);
-            return res.json({ success: true, data: positions });
+            return sendSuccess(res, positions);
         }
 
-        // Fetch all (or filtered by user? Currently all for MVP)
         const positions = await StrategyRunRepository.getPositionsByStrategy();
-
-        res.json({
-            success: true,
-            data: positions
-        });
+        sendSuccess(res, positions);
     } catch (error) {
         next(error);
     }
 };
-
-

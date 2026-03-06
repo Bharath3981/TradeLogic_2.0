@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "API Server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@tradelogic/api", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "Web App",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@tradelogic/web", "dev"],
+      "port": 9001
+    }
+  ]
+}
