@@ -4,6 +4,8 @@ export interface ScreenerScanOptions {
     sector?: string;
     minScore?: number;
     limit?: number;
+    trend?: 'ALL' | 'uptrend' | 'downtrend' | 'sideways';
+    holdingMonths?: number;
 }
 
 export interface SRLevel {
@@ -16,12 +18,12 @@ export interface SRLevel {
 
 export interface ScreenerStockIndicators {
     rsi:            { value: number; signal: string };
-    macd:           { signal: string; histogram: number };
+    macd:           { signal: string; histogram: number; momentum: string };
     ema:            { ema20: number; ema50: number; ema200: number; signal: string };
     bollingerBands: { upper: number; middle: number; lower: number; signal: string };
-    adx:            { value: number; signal: string };
-    volume:         { signal: string; ratio: number };
-    fiftyTwoWeek:   { high: number; low: number; currentPct: number; signal: string };
+    adx:            { value: number; plusDI: number; minusDI: number; signal: string };
+    volume:         { signal: string; ratio: number; direction: string };
+    fiftyTwoWeek:   { high: number; low: number; currentPct: number; isBreakout: boolean; signal: string };
     stochastic:     { k: number; d: number; signal: string };
     atr:            { value: number; pct: number };
     supportResistance: {

@@ -27,8 +27,8 @@ function getRecoColor(r: string) {
     return '#9e9e9e';
 }
 function getSigColor(s: string) {
-    if (['bullish','surge','near_high','strong','uptrend'].includes(s)) return '#4caf50';
-    if (['bearish','near_low','weak','downtrend'].includes(s))          return '#ef5350';
+    if (['bullish','surge','near_high','strong','uptrend','strong_bullish','moderate_bullish','accumulation'].includes(s)) return '#4caf50';
+    if (['bearish','near_low','weak','downtrend','strong_bearish','distribution'].includes(s)) return '#ef5350';
     return '#ffa726';
 }
 
@@ -121,19 +121,19 @@ function DetailModal({ stock, onClose }: { stock: ScreenerStock; onClose: () => 
                     <Grid size={{ xs: 12, md: 6 }}>
                         <Typography sx={{ fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.2em', color: 'primary.main', textTransform: 'uppercase', mb: 1 }}>// Core Indicators</Typography>
                         <DataRow label="RSI (14)"       value={`${ind.rsi.value}`}                                          color={getSigColor(ind.rsi.signal)} />
-                        <DataRow label="MACD Hist"      value={`${ind.macd.histogram > 0 ? '+' : ''}${ind.macd.histogram.toFixed(2)}`} color={getSigColor(ind.macd.signal)} />
+                        <DataRow label="MACD Hist"      value={`${ind.macd.histogram > 0 ? '+' : ''}${ind.macd.histogram.toFixed(2)} (${ind.macd.momentum})`} color={getSigColor(ind.macd.signal)} />
                         <DataRow label="EMA 20"         value={`₹${fmt(ind.ema.ema20)}`}                                    color={getSigColor(ind.ema.signal)} />
                         <DataRow label="EMA 50"         value={`₹${fmt(ind.ema.ema50)}`} />
                         <DataRow label="EMA 200"        value={`₹${fmt(ind.ema.ema200)}`} />
                         <DataRow label="BB Upper"       value={`₹${fmt(ind.bollingerBands.upper)}`} />
                         <DataRow label="BB Lower"       value={`₹${fmt(ind.bollingerBands.lower)}`} />
-                        <DataRow label="ADX (14)"       value={`${ind.adx.value}`}                                          color={getSigColor(ind.adx.signal)} />
+                        <DataRow label="ADX (14)"       value={`${ind.adx.value}  +DI: ${ind.adx.plusDI} / -DI: ${ind.adx.minusDI}`} color={getSigColor(ind.adx.signal)} />
                         <DataRow label="Stoch %K / %D"  value={`${ind.stochastic.k} / ${ind.stochastic.d}`}                 color={getSigColor(ind.stochastic.signal)} />
                         <DataRow label="ATR (14)"       value={`₹${fmt(ind.atr.value)} (${ind.atr.pct}%)`} />
-                        <DataRow label="Volume Ratio"   value={`${ind.volume.ratio.toFixed(2)}x`}                           color={getSigColor(ind.volume.signal)} />
+                        <DataRow label="Volume"         value={`${ind.volume.ratio.toFixed(2)}x — ${ind.volume.direction}`}  color={getSigColor(ind.volume.direction)} />
                         <DataRow label="Trend"          value={`${ind.trendStrength.direction} / ${ind.trendStrength.strength}`} color={getSigColor(ind.trendStrength.direction)} />
                         <DataRow label="Candle Pattern" value={ind.candlePattern.pattern}                                   color={getSigColor(ind.candlePattern.signal)} />
-                        <DataRow label="52W High"       value={`₹${fmt(ind.fiftyTwoWeek.high)} (${ind.fiftyTwoWeek.currentPct.toFixed(1)}%)`} />
+                        <DataRow label="52W High"       value={`₹${fmt(ind.fiftyTwoWeek.high)} (${ind.fiftyTwoWeek.currentPct.toFixed(1)}%)${ind.fiftyTwoWeek.isBreakout ? ' 🔥 BREAKOUT' : ''}`} color={ind.fiftyTwoWeek.isBreakout ? '#4caf50' : undefined} />
                     </Grid>
 
                     {/* RIGHT — S/R + Pivot Points */}
@@ -273,11 +273,12 @@ function StockCard({ stock, onClick }: { stock: ScreenerStock; onClick: () => vo
             {/* Core indicator badges */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px', mb: 1.5 }}>
                 <Badge label="RSI"   signal={ind.rsi.signal}            value={ind.rsi.value.toFixed(0)} />
-                <Badge label="MACD"  signal={ind.macd.signal} />
+                <Badge label="MACD"  signal={ind.macd.signal}           value={ind.macd.momentum === 'expanding' ? '▲' : ind.macd.momentum === 'contracting' ? '▼' : '—'} />
                 <Badge label="EMA"   signal={ind.ema.signal} />
                 <Badge label="ADX"   signal={ind.adx.signal}            value={ind.adx.value.toFixed(0)} />
                 <Badge label="STOCH" signal={ind.stochastic.signal}     value={ind.stochastic.k.toFixed(0)} />
-                <Badge label="VOL"   signal={ind.volume.signal}         value={`${ind.volume.ratio.toFixed(1)}x`} />
+                <Badge label="VOL"   signal={ind.volume.direction !== 'neutral' ? ind.volume.direction : ind.volume.signal} value={`${ind.volume.ratio.toFixed(1)}x`} />
+                {ind.fiftyTwoWeek.isBreakout && <Badge label="52W BREAKOUT" signal="bullish" />}
                 <Badge label={ind.candlePattern.pattern !== 'None' ? ind.candlePattern.pattern : 'CANDLE'} signal={ind.candlePattern.signal} />
             </Box>
 
@@ -341,7 +342,12 @@ function StockCard({ stock, onClick }: { stock: ScreenerStock; onClick: () => vo
 
 // ─── Main Screener Page ───────────────────────────────────────────────────────
 export function Screener() {
-    const { result, sectors, isScanning, error, selectedSector, minScore, limit, runScan, fetchSectors, setSelectedSector, setMinScore, setLimit } = useScreenerStore();
+    const {
+        result, sectors, isScanning, error,
+        selectedSector, selectedTrend, holdingMonths, minScore, limit,
+        runScan, fetchSectors,
+        setSelectedSector, setSelectedTrend, setHoldingMonths, setMinScore, setLimit,
+    } = useScreenerStore();
     const [selected, setSelected] = useState<ScreenerStock | null>(null);
 
     useEffect(() => { fetchSectors(); }, [fetchSectors]);
@@ -367,7 +373,7 @@ export function Screener() {
             {/* Controls */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
                 <Grid container spacing={2} alignItems="flex-end">
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
                             <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Sector</InputLabel>
                             <Select value={selectedSector} label="Sector" onChange={e => setSelectedSector(e.target.value)} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
@@ -375,15 +381,37 @@ export function Screener() {
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
-                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Min Score: {minScore}</InputLabel>
-                            <Select value={minScore} label={`Min Score: ${minScore}`} onChange={e => setMinScore(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Trend</InputLabel>
+                            <Select value={selectedTrend} label="Trend" onChange={e => setSelectedTrend(e.target.value as 'ALL' | 'uptrend' | 'downtrend' | 'sideways')} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                                <MenuItem value="ALL" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>ALL</MenuItem>
+                                <MenuItem value="uptrend" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>Uptrend</MenuItem>
+                                <MenuItem value="downtrend" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>Downtrend</MenuItem>
+                                <MenuItem value="sideways" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>Sideways</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Holding</InputLabel>
+                            <Select value={holdingMonths} label="Holding" onChange={e => setHoldingMonths(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                                <MenuItem value={1} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>1 Month</MenuItem>
+                                <MenuItem value={2} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>2 Months</MenuItem>
+                                <MenuItem value={3} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>3 Months</MenuItem>
+                                <MenuItem value={6} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>6 Months</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Min Score</InputLabel>
+                            <Select value={minScore} label="Min Score" onChange={e => setMinScore(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
                                 {[20, 30, 40, 50, 60, 70].map(v => <MenuItem key={v} value={v} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>{v}+</MenuItem>)}
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
                             <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Show Top</InputLabel>
                             <Select value={limit} label="Show Top" onChange={e => setLimit(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
@@ -391,7 +419,7 @@ export function Screener() {
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <Button fullWidth variant="outlined" onClick={runScan} disabled={isScanning} sx={{ fontFamily: 'monospace', letterSpacing: '0.15em', fontWeight: 700 }}>
                             {isScanning ? '⟳ SCANNING...' : '▶ RUN SCAN'}
                         </Button>
