@@ -27,8 +27,8 @@ function getRecoColor(r: string) {
     return '#9e9e9e';
 }
 function getSigColor(s: string) {
-    if (['bullish','surge','near_high','strong','uptrend'].includes(s)) return '#4caf50';
-    if (['bearish','near_low','weak','downtrend'].includes(s))          return '#ef5350';
+    if (['bullish','surge','near_high','strong','uptrend','strong_bullish','moderate_bullish','accumulation'].includes(s)) return '#4caf50';
+    if (['bearish','near_low','weak','downtrend','strong_bearish','distribution'].includes(s)) return '#ef5350';
     return '#ffa726';
 }
 
@@ -121,19 +121,19 @@ function DetailModal({ stock, onClose }: { stock: ScreenerStock; onClose: () => 
                     <Grid size={{ xs: 12, md: 6 }}>
                         <Typography sx={{ fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.2em', color: 'primary.main', textTransform: 'uppercase', mb: 1 }}>// Core Indicators</Typography>
                         <DataRow label="RSI (14)"       value={`${ind.rsi.value}`}                                          color={getSigColor(ind.rsi.signal)} />
-                        <DataRow label="MACD Hist"      value={`${ind.macd.histogram > 0 ? '+' : ''}${ind.macd.histogram.toFixed(2)}`} color={getSigColor(ind.macd.signal)} />
+                        <DataRow label="MACD Hist"      value={`${ind.macd.histogram > 0 ? '+' : ''}${ind.macd.histogram.toFixed(2)} (${ind.macd.momentum})`} color={getSigColor(ind.macd.signal)} />
                         <DataRow label="EMA 20"         value={`₹${fmt(ind.ema.ema20)}`}                                    color={getSigColor(ind.ema.signal)} />
                         <DataRow label="EMA 50"         value={`₹${fmt(ind.ema.ema50)}`} />
                         <DataRow label="EMA 200"        value={`₹${fmt(ind.ema.ema200)}`} />
                         <DataRow label="BB Upper"       value={`₹${fmt(ind.bollingerBands.upper)}`} />
                         <DataRow label="BB Lower"       value={`₹${fmt(ind.bollingerBands.lower)}`} />
-                        <DataRow label="ADX (14)"       value={`${ind.adx.value}`}                                          color={getSigColor(ind.adx.signal)} />
+                        <DataRow label="ADX (14)"       value={`${ind.adx.value}  +DI: ${ind.adx.plusDI} / -DI: ${ind.adx.minusDI}`} color={getSigColor(ind.adx.signal)} />
                         <DataRow label="Stoch %K / %D"  value={`${ind.stochastic.k} / ${ind.stochastic.d}`}                 color={getSigColor(ind.stochastic.signal)} />
                         <DataRow label="ATR (14)"       value={`₹${fmt(ind.atr.value)} (${ind.atr.pct}%)`} />
-                        <DataRow label="Volume Ratio"   value={`${ind.volume.ratio.toFixed(2)}x`}                           color={getSigColor(ind.volume.signal)} />
+                        <DataRow label="Volume"         value={`${ind.volume.ratio.toFixed(2)}x — ${ind.volume.direction}`}  color={getSigColor(ind.volume.direction)} />
                         <DataRow label="Trend"          value={`${ind.trendStrength.direction} / ${ind.trendStrength.strength}`} color={getSigColor(ind.trendStrength.direction)} />
                         <DataRow label="Candle Pattern" value={ind.candlePattern.pattern}                                   color={getSigColor(ind.candlePattern.signal)} />
-                        <DataRow label="52W High"       value={`₹${fmt(ind.fiftyTwoWeek.high)} (${ind.fiftyTwoWeek.currentPct.toFixed(1)}%)`} />
+                        <DataRow label="52W High"       value={`₹${fmt(ind.fiftyTwoWeek.high)} (${ind.fiftyTwoWeek.currentPct.toFixed(1)}%)${ind.fiftyTwoWeek.isBreakout ? ' 🔥 BREAKOUT' : ''}`} color={ind.fiftyTwoWeek.isBreakout ? '#4caf50' : undefined} />
                     </Grid>
 
                     {/* RIGHT — S/R + Pivot Points */}
@@ -273,11 +273,12 @@ function StockCard({ stock, onClick }: { stock: ScreenerStock; onClick: () => vo
             {/* Core indicator badges */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '4px', mb: 1.5 }}>
                 <Badge label="RSI"   signal={ind.rsi.signal}            value={ind.rsi.value.toFixed(0)} />
-                <Badge label="MACD"  signal={ind.macd.signal} />
+                <Badge label="MACD"  signal={ind.macd.signal}           value={ind.macd.momentum === 'expanding' ? '▲' : ind.macd.momentum === 'contracting' ? '▼' : '—'} />
                 <Badge label="EMA"   signal={ind.ema.signal} />
                 <Badge label="ADX"   signal={ind.adx.signal}            value={ind.adx.value.toFixed(0)} />
                 <Badge label="STOCH" signal={ind.stochastic.signal}     value={ind.stochastic.k.toFixed(0)} />
-                <Badge label="VOL"   signal={ind.volume.signal}         value={`${ind.volume.ratio.toFixed(1)}x`} />
+                <Badge label="VOL"   signal={ind.volume.direction !== 'neutral' ? ind.volume.direction : ind.volume.signal} value={`${ind.volume.ratio.toFixed(1)}x`} />
+                {ind.fiftyTwoWeek.isBreakout && <Badge label="52W BREAKOUT" signal="bullish" />}
                 <Badge label={ind.candlePattern.pattern !== 'None' ? ind.candlePattern.pattern : 'CANDLE'} signal={ind.candlePattern.signal} />
             </Box>
 

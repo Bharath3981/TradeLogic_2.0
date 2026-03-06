@@ -64,12 +64,12 @@ export interface ScreenerStock {
     signals: string[];
     indicators: {
         rsi:            { value: number; signal: string };
-        macd:           { signal: string; histogram: number };
+        macd:           { signal: string; histogram: number; momentum: string };
         ema:            { ema20: number; ema50: number; ema200: number; signal: string };
         bollingerBands: { upper: number; middle: number; lower: number; signal: string };
-        adx:            { value: number; signal: string };
-        volume:         { signal: string; ratio: number };
-        fiftyTwoWeek:   { high: number; low: number; currentPct: number; signal: string };
+        adx:            { value: number; plusDI: number; minusDI: number; signal: string };
+        volume:         { signal: string; ratio: number; direction: string };
+        fiftyTwoWeek:   { high: number; low: number; currentPct: number; isBreakout: boolean; signal: string };
         stochastic:     { k: number; d: number; signal: string };
         atr:            { value: number; pct: number };
         supportResistance: {
@@ -206,17 +206,18 @@ export const ScreenerService = {
                             signals:     analysis.signals,
                             indicators: {
                                 rsi:            { value: analysis.rsi.value,    signal: analysis.rsi.signal },
-                                macd:           { signal: analysis.macd.signal, histogram: analysis.macd.histogram },
+                                macd:           { signal: analysis.macd.signal, histogram: analysis.macd.histogram, momentum: analysis.macd.momentum },
                                 ema:            { ema20: analysis.ema.ema20,    ema50: analysis.ema.ema50, ema200: analysis.ema.ema200, signal: analysis.ema.signal },
                                 bollingerBands: { upper: analysis.bollingerBands.upper, middle: analysis.bollingerBands.middle, lower: analysis.bollingerBands.lower, signal: analysis.bollingerBands.signal },
-                                adx:            { value: analysis.adx.value,   signal: analysis.adx.signal },
+                                adx:            { value: analysis.adx.value, plusDI: analysis.adx.plusDI, minusDI: analysis.adx.minusDI, signal: analysis.adx.signal },
                                 volume: {
-                                    signal: analysis.volume.signal,
-                                    ratio:  analysis.volume.avg20 > 0
+                                    signal:    analysis.volume.signal,
+                                    ratio:     analysis.volume.avg20 > 0
                                         ? analysis.volume.current / analysis.volume.avg20
                                         : 1,
+                                    direction: analysis.volume.direction,
                                 },
-                                fiftyTwoWeek:   { high: analysis.fiftyTwoWeek.high, low: analysis.fiftyTwoWeek.low, currentPct: analysis.fiftyTwoWeek.currentPct, signal: analysis.fiftyTwoWeek.signal },
+                                fiftyTwoWeek:   { high: analysis.fiftyTwoWeek.high, low: analysis.fiftyTwoWeek.low, currentPct: analysis.fiftyTwoWeek.currentPct, isBreakout: analysis.fiftyTwoWeek.isBreakout, signal: analysis.fiftyTwoWeek.signal },
                                 stochastic:     analysis.stochastic,
                                 atr:            analysis.atr,
                                 supportResistance: analysis.supportResistance,
