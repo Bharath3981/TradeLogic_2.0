@@ -19,13 +19,15 @@ export const ScreenerController = {
                 throw new AppError(401, ErrorCode.KITE_TOKEN_MISSING, 'Kite session not found. Please connect Kite first.');
             }
 
-            const { sector, minScore, limit } = req.body;
-            logger.info({ msg: 'Screener scan requested', userId, sector, minScore, limit });
+            const { sector, minScore, limit, trend, holdingMonths } = req.body;
+            logger.info({ msg: 'Screener scan requested', userId, sector, minScore, limit, trend, holdingMonths });
 
             const result = await ScreenerService.runScan(userId, accessToken, {
                 sector,
-                minScore: minScore ? Number(minScore) : 40,
-                limit:    limit    ? Number(limit)    : 20,
+                minScore:      minScore      ? Number(minScore)      : 40,
+                limit:         limit         ? Number(limit)         : 20,
+                trend:         trend         || 'ALL',
+                holdingMonths: holdingMonths ? Number(holdingMonths) : 3,
             });
 
             sendSuccess(res, result);

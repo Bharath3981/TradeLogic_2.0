@@ -4,6 +4,8 @@ export interface ScreenerScanOptions {
     sector?: string;
     minScore?: number;
     limit?: number;
+    trend?: 'ALL' | 'uptrend' | 'downtrend' | 'sideways';
+    holdingMonths?: number;
 }
 
 export interface SRLevel {

@@ -494,7 +494,7 @@ function calculateTrendStrength(
 
 // ─── Main Analyzer ────────────────────────────────────────────────────────────
 
-export function analyzeStock(candles: Candle[]): IndicatorResult {
+export function analyzeStock(candles: Candle[], holdingMonths: number = 3): IndicatorResult {
     if (candles.length < 50) return emptyResult();
 
     const closes       = candles.map(c => c.close);
@@ -600,127 +600,148 @@ export function analyzeStock(candles: Candle[]): IndicatorResult {
 
     // ── Composite Score — Bullish Trend Detection (0–100)
     // ─────────────────────────────────────────────────────
-    // CATEGORY 1: Trend Direction (max 33 pts)
-    // CATEGORY 2: Momentum        (max 30 pts)
-    // CATEGORY 3: Breakout        (max 20 pts)
-    // CATEGORY 4: Volume          (max 10 pts)
-    // CATEGORY 5: Entry Signals   (max 8 pts)
+    // CATEGORY 1: Trend Direction (max 33 pts base)
+    // CATEGORY 2: Momentum        (max 30 pts base)
+    // CATEGORY 3: Breakout        (max 20 pts base)
+    // CATEGORY 4: Volume          (max 10 pts base)
+    // CATEGORY 5: Entry Signals   (max 8 pts base)
     // ─────────────────────────────────────────────────────
-    let score = 0;
+    // Holding-period multipliers shift emphasis per category:
+    // Short-term (1-2mo) → momentum & entry weighted up
+    // Long-term  (6mo)   → trend & breakout weighted up
+    // ─────────────────────────────────────────────────────
+    const HOLDING_MULTIPLIERS: Record<number, [number, number, number, number, number]> = {
+        //  [Trend, Momentum, Breakout, Volume, Entry]
+        1:  [0.6,   1.4,      0.8,      1.2,    1.4],
+        2:  [0.8,   1.2,      1.0,      1.1,    1.2],
+        3:  [1.0,   1.0,      1.0,      1.0,    1.0],
+        6:  [1.3,   0.7,      1.3,      1.0,    0.7],
+    };
+
+    let trendScore    = 0;
+    let momentumScore = 0;
+    let breakoutScore = 0;
+    let volumeScore   = 0;
+    let entryScore    = 0;
+    let penalties     = 0;
     const signals: string[] = [];
 
-    // ── CATEGORY 1: Trend Direction (33 pts max)
+    // ── CATEGORY 1: Trend Direction (33 pts max base)
 
-    // Full EMA stack: price > EMA20 > EMA50 > EMA200 = long-term confirmed uptrend
     if (currentPrice > ema20 && ema20 > ema50 && ema50 > ema200) {
-        score += 20;
+        trendScore += 20;
         signals.push('Full EMA stack aligned (price > EMA20 > EMA50 > EMA200) — confirmed uptrend');
     } else if (currentPrice > ema20 && ema20 > ema50) {
-        score += 12;
+        trendScore += 12;
         signals.push('EMA20/50 aligned — short-term uptrend');
     } else if (currentPrice > ema50) {
-        score += 5;
+        trendScore += 5;
         signals.push('Price above EMA50 — mild bullish');
     }
 
-    // ADX with directional confirmation: strong trend + bullish direction
     if (adxSig === 'strong_bullish') {
-        score += 13;
+        trendScore += 13;
         signals.push(`ADX ${adxValue.toFixed(0)} — strong trend, +DI ${plusDI.toFixed(0)} > -DI ${minusDI.toFixed(0)} (bullish direction confirmed)`);
     } else if (adxSig === 'moderate_bullish') {
-        score += 7;
+        trendScore += 7;
         signals.push(`ADX ${adxValue.toFixed(0)} — moderate bullish trend momentum`);
     }
 
-    // ── CATEGORY 2: Momentum (30 pts max)
+    // ── CATEGORY 2: Momentum (30 pts max base)
 
-    // MACD: highest score for expanding bullish histogram (accelerating momentum)
     if (macdSignal === 'bullish' && macdData.momentum === 'expanding') {
-        score += 12;
+        momentumScore += 12;
         signals.push('MACD bullish with expanding histogram — momentum accelerating');
     } else if (macdSignal === 'bullish') {
-        score += 8;
+        momentumScore += 8;
         signals.push('MACD bullish crossover — above signal line');
     } else if (macdData.momentum === 'expanding' && macdData.histogram < 0) {
-        score += 3;
+        momentumScore += 3;
         signals.push('MACD histogram recovering — nascent bullish momentum');
     }
 
-    // RSI: optimal bullish trend zone is 55-75 (above midline, not overbought)
     if (rsiValue >= 55 && rsiValue <= 75) {
-        score += 10;
+        momentumScore += 10;
         signals.push(`RSI ${rsiValue.toFixed(0)} — bullish momentum zone (55–75)`);
     } else if (rsiValue >= 50 && rsiValue < 55) {
-        score += 5;
+        momentumScore += 5;
         signals.push(`RSI ${rsiValue.toFixed(0)} — above midline, mild bullish`);
     } else if (rsiValue > 75) {
-        score += 3;
+        momentumScore += 3;
         signals.push(`RSI ${rsiValue.toFixed(0)} — overbought (strong but use caution)`);
     }
 
-    // Stochastic: K & D above 50 with K > D = trend momentum confirmation
     if (stoch.k > 50 && stoch.d > 50 && stoch.k > stoch.d) {
-        score += 8;
+        momentumScore += 8;
         signals.push(`Stochastic ${stoch.k.toFixed(0)}/${stoch.d.toFixed(0)} — bullish momentum above midline`);
     } else if (stoch.k < 30 && stoch.k > stoch.d) {
-        score += 4;
+        momentumScore += 4;
         signals.push(`Stochastic ${stoch.k.toFixed(0)} — oversold bounce (reversal signal)`);
     }
 
-    // ── CATEGORY 3: Breakout & 52-Week High Proximity (20 pts max)
+    // ── CATEGORY 3: Breakout & 52-Week High Proximity (20 pts max base)
 
     if (isBreakout) {
-        score += 20;
+        breakoutScore += 20;
         signals.push(`52-week HIGH BREAKOUT — price within ${Math.abs(pctFromHigh).toFixed(1)}% of yearly high`);
     } else if (pctFromHigh >= -5) {
-        score += 15;
+        breakoutScore += 15;
         signals.push(`Near 52-week high: ${Math.abs(pctFromHigh).toFixed(1)}% below — strong bullish momentum`);
     } else if (pctFromHigh >= -15) {
-        score += 8;
+        breakoutScore += 8;
         signals.push(`Within ${Math.abs(pctFromHigh).toFixed(1)}% of 52-week high`);
     }
 
-    // ── CATEGORY 4: Volume Confirmation (10 pts max)
+    // ── CATEGORY 4: Volume Confirmation (10 pts max base)
 
-    // Volume surge on bullish candle = strongest confirmation (institutional buying)
     if (volSignal === 'surge' && lastCandle.close > lastCandle.open) {
-        score += 10;
+        volumeScore += 10;
         signals.push(`Volume surge ${volRatio.toFixed(1)}x on bullish candle — institutional accumulation`);
     } else if (volSignal === 'surge') {
-        score += 5;
+        volumeScore += 5;
         signals.push(`Volume surge ${volRatio.toFixed(1)}x avg`);
     } else if (volumeDirection === 'accumulation') {
-        score += 5;
+        volumeScore += 5;
         signals.push('Volume accumulation pattern — avg up-day volume exceeds down-day volume');
     }
 
-    // ── CATEGORY 5: Entry Confluence (8 pts max)
+    // ── CATEGORY 5: Entry Confluence (8 pts max base)
 
     if (srSignal === 'bullish' && riskRewardRatio >= 2.0) {
-        score += 5;
+        entryScore += 5;
         signals.push(`Near support ₹${nearestSupport} — favourable R:R ${riskRewardRatio}x`);
     } else if (srSignal === 'bullish') {
-        score += 3;
+        entryScore += 3;
         signals.push(`Near support ₹${nearestSupport} — R:R ${riskRewardRatio}x`);
     }
 
     if (pattern.signal === 'bullish') {
-        score += 3;
+        entryScore += 3;
         signals.push(`${pattern.pattern} — bullish candlestick signal`);
     }
 
-    // ── PENALTIES (bearish or trend-contrary signals)
+    // ── PENALTIES (bearish or trend-contrary — unscaled by holding period)
 
-    if (currentPrice < ema50)                                  score -= 10;  // Not in uptrend
-    if (currentPrice < ema200)                                 score -= 5;   // Long-term bearish
-    if (adxSig === 'strong_bearish')                           score -= 10;  // Confirmed strong downtrend
-    if (macdSignal === 'bearish' && macdData.momentum === 'expanding') score -= 8; // Bearish momentum building
-    if (macdSignal === 'bearish')                              score -= 4;
-    if (pctFromLow <= 20)                                      score -= 5;   // Near 52-week low
-    if (pattern.signal === 'bearish')                          score -= 5;
-    if (volumeDirection === 'distribution')                    score -= 3;   // Institutional selling
+    if (currentPrice < ema50)                                              penalties -= 10;
+    if (currentPrice < ema200)                                             penalties -= 5;
+    if (adxSig === 'strong_bearish')                                       penalties -= 10;
+    if (macdSignal === 'bearish' && macdData.momentum === 'expanding')     penalties -= 8;
+    if (macdSignal === 'bearish')                                          penalties -= 4;
+    if (pctFromLow <= 20)                                                  penalties -= 5;
+    if (pattern.signal === 'bearish')                                      penalties -= 5;
+    if (volumeDirection === 'distribution')                                penalties -= 3;
 
-    score = Math.max(0, Math.min(100, score));
+    // ── Apply holding-period multipliers and compute final score
+    const [mT, mM, mB, mV, mE] = HOLDING_MULTIPLIERS[holdingMonths] ?? HOLDING_MULTIPLIERS[3];
+
+    let score = (trendScore * mT)
+              + (momentumScore * mM)
+              + (breakoutScore * mB)
+              + (volumeScore * mV)
+              + (entryScore * mE)
+              + penalties;
+
+    score = Math.max(0, Math.min(100, Math.round(score)));
 
     return {
         rsi:            { value: round2(rsiValue), signal: rsiSignal },

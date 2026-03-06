@@ -124,11 +124,11 @@ export const ScreenerService = {
     async runScan(
         userId: string,
         accessToken: string | undefined,
-        options: { sector?: string; minScore?: number; limit?: number } = {}
+        options: { sector?: string; minScore?: number; limit?: number; trend?: string; holdingMonths?: number } = {}
     ): Promise<ScreenerResult> {
 
         const startTime = Date.now();
-        const { sector, minScore = 40, limit = 20 } = options;
+        const { sector, minScore = 40, limit = 20, trend = 'ALL', holdingMonths = 3 } = options;
         const broker = BrokerFactory.getBroker(UserMode.REAL, userId, accessToken);
 
         // Step 1 — get correct instrument tokens from Kite dynamically
@@ -150,7 +150,7 @@ export const ScreenerService = {
                 return true;
             }) as ({ symbol: string; name: string; sector: string; token: number })[];
 
-        logger.info({ msg: 'Screener scan started', total: resolvedStocks.length });
+        logger.info({ msg: 'Screener scan started', total: resolvedStocks.length, trend, holdingMonths });
 
         const results: ScreenerStock[] = [];
         const toDate   = new Date();
@@ -192,7 +192,7 @@ export const ScreenerService = {
                             volume: Number(c.volume),
                         }));
 
-                        const analysis    = analyzeStock(candles);
+                        const analysis    = analyzeStock(candles, holdingMonths);
                         const currentPrice = candles[candles.length - 1].close;
 
                         logger.info({ msg: `Score`, symbol: stock.symbol, score: analysis.score });
@@ -249,6 +249,7 @@ export const ScreenerService = {
         }
 
         const filtered = results
+            .filter(s => trend === 'ALL' || s.indicators.trendStrength.direction === trend)
             .filter(s => s.score >= minScore)
             .sort((a, b) => b.score - a.score)
             .slice(0, limit);

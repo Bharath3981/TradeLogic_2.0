@@ -18,6 +18,8 @@ interface ScreenerState {
 
     // Filters
     selectedSector: string;
+    selectedTrend: 'ALL' | 'uptrend' | 'downtrend' | 'sideways';
+    holdingMonths: number;
     minScore: number;
     limit: number;
 
@@ -25,6 +27,8 @@ interface ScreenerState {
     runScan: () => Promise<void>;
     fetchSectors: () => Promise<void>;
     setSelectedSector: (sector: string) => void;
+    setSelectedTrend: (trend: 'ALL' | 'uptrend' | 'downtrend' | 'sideways') => void;
+    setHoldingMonths: (months: number) => void;
     setMinScore: (score: number) => void;
     setLimit: (limit: number) => void;
     clearResults: () => void;
@@ -42,17 +46,21 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
 
     // Filters (defaults)
     selectedSector: 'ALL',
+    selectedTrend: 'ALL',
+    holdingMonths: 3,
     minScore: 40,
     limit: 20,
 
     runScan: async () => {
-        const { selectedSector, minScore, limit } = get();
+        const { selectedSector, selectedTrend, holdingMonths, minScore, limit } = get();
 
         set({ isScanning: true, error: null });
 
         try {
             const options: ScreenerScanOptions = {
                 sector: selectedSector,
+                trend: selectedTrend,
+                holdingMonths,
                 minScore,
                 limit,
             };
@@ -84,6 +92,8 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
     },
 
     setSelectedSector: (sector) => set({ selectedSector: sector }),
+    setSelectedTrend: (trend) => set({ selectedTrend: trend }),
+    setHoldingMonths: (months) => set({ holdingMonths: months }),
     setMinScore: (score) => set({ minScore: score }),
     setLimit: (limit) => set({ limit }),
 

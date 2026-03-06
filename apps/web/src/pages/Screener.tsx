@@ -342,7 +342,12 @@ function StockCard({ stock, onClick }: { stock: ScreenerStock; onClick: () => vo
 
 // ─── Main Screener Page ───────────────────────────────────────────────────────
 export function Screener() {
-    const { result, sectors, isScanning, error, selectedSector, minScore, limit, runScan, fetchSectors, setSelectedSector, setMinScore, setLimit } = useScreenerStore();
+    const {
+        result, sectors, isScanning, error,
+        selectedSector, selectedTrend, holdingMonths, minScore, limit,
+        runScan, fetchSectors,
+        setSelectedSector, setSelectedTrend, setHoldingMonths, setMinScore, setLimit,
+    } = useScreenerStore();
     const [selected, setSelected] = useState<ScreenerStock | null>(null);
 
     useEffect(() => { fetchSectors(); }, [fetchSectors]);
@@ -368,7 +373,7 @@ export function Screener() {
             {/* Controls */}
             <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
                 <Grid container spacing={2} alignItems="flex-end">
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
                             <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Sector</InputLabel>
                             <Select value={selectedSector} label="Sector" onChange={e => setSelectedSector(e.target.value)} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
@@ -376,15 +381,37 @@ export function Screener() {
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
-                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Min Score: {minScore}</InputLabel>
-                            <Select value={minScore} label={`Min Score: ${minScore}`} onChange={e => setMinScore(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Trend</InputLabel>
+                            <Select value={selectedTrend} label="Trend" onChange={e => setSelectedTrend(e.target.value as 'ALL' | 'uptrend' | 'downtrend' | 'sideways')} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                                <MenuItem value="ALL" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>ALL</MenuItem>
+                                <MenuItem value="uptrend" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>Uptrend</MenuItem>
+                                <MenuItem value="downtrend" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>Downtrend</MenuItem>
+                                <MenuItem value="sideways" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>Sideways</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Holding</InputLabel>
+                            <Select value={holdingMonths} label="Holding" onChange={e => setHoldingMonths(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
+                                <MenuItem value={1} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>1 Month</MenuItem>
+                                <MenuItem value={2} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>2 Months</MenuItem>
+                                <MenuItem value={3} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>3 Months</MenuItem>
+                                <MenuItem value={6} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>6 Months</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Min Score</InputLabel>
+                            <Select value={minScore} label="Min Score" onChange={e => setMinScore(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
                                 {[20, 30, 40, 50, 60, 70].map(v => <MenuItem key={v} value={v} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>{v}+</MenuItem>)}
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
                             <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Show Top</InputLabel>
                             <Select value={limit} label="Show Top" onChange={e => setLimit(Number(e.target.value))} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
@@ -392,7 +419,7 @@ export function Screener() {
                             </Select>
                         </FormControl>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <Button fullWidth variant="outlined" onClick={runScan} disabled={isScanning} sx={{ fontFamily: 'monospace', letterSpacing: '0.15em', fontWeight: 700 }}>
                             {isScanning ? '⟳ SCANNING...' : '▶ RUN SCAN'}
                         </Button>
