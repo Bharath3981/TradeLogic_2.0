@@ -21,9 +21,9 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@tradelogic/shared": "workspace:*",
-    "@tradelogic/indicators": "workspace:*",
     "@prisma/client": "^5.10.0",
+    "@tradelogic/indicators": "workspace:*",
+    "@tradelogic/shared": "workspace:*",
     "axios": "^1.13.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
@@ -31,6 +31,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "kiteconnect": "^5.1.0",

@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { generateId } from '../utils/id';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export const UserRepository = {
     async findByEmail(email: string) {

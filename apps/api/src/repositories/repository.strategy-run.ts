@@ -1,7 +1,6 @@
 
-import { PrismaClient, StrategyRunMode } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import type { StrategyRunMode } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 export const StrategyRunRepository = {
     

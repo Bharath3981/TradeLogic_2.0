@@ -1,7 +1,6 @@
-import { PrismaClient, Watchlist } from '@prisma/client';
+import type { Watchlist } from '@prisma/client';
 import { generateId } from '../utils/id';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export const WatchlistRepository = {
     async findItem(userId: string, watchlistSet: number, instrumentToken: string) {

@@ -4,10 +4,8 @@ import { logger } from '../utils/logger';
 import { TickerService, tickerEvents } from '../services/service.ticker';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/config';
-import { PrismaClient } from '@prisma/client';
 import { decrypt } from '../utils/crypto';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export class SocketManager {
     private io: SocketIOServer;
@@ -15,7 +13,8 @@ export class SocketManager {
     constructor(httpServer: HttpServer) {
         this.io = new SocketIOServer(httpServer, {
             cors: {
-                origin: '*', // Allow all for dev
+                origin: config.ALLOWED_ORIGIN,
+                credentials: true,
                 methods: ['GET', 'POST']
             }
         });
@@ -27,20 +26,15 @@ export class SocketManager {
         this.io.on('connection', (socket: Socket) => {
             logger.info(`Client connected: ${socket.id}`);
 
-            // Check for access_token in handshake query or auth object
             const queryToken = socket.handshake.query.access_token as string;
-            const authToken = (socket.handshake.auth as any).token; // often used in socket.io v4
-            
-            const token = queryToken || authToken;
+            const authToken = (socket.handshake.auth as any).token;
 
-            // Extract 'token' from handshake, which is now the App JWT
             const jwtToken = queryToken || authToken;
 
             if (jwtToken) {
                 try {
                     const decoded = jwt.verify(jwtToken, config.JWT_SECRET) as any;
-                    
-                    // Valid JWT -> Get User -> Get Kite Token
+
                     prisma.user.findUnique({
                         where: { id: decoded.id },
                         select: { kiteAccessToken: true }
@@ -67,15 +61,10 @@ export class SocketManager {
 
             socket.on('subscribe', (tokens: number[]) => {
                 if (Array.isArray(tokens)) {
-                    // Join rooms for each token to allow granular broadcasting
-                    // Room name: "token_123456"
                     tokens.forEach(token => {
                         socket.join(`token_${token}`);
                     });
-                    
-                    // Tell TickerService to subscribe to these upstream
                     TickerService.subscribe(tokens);
-                    
                     logger.info(`Socket ${socket.id} subscribed to ${tokens}`);
                 }
             });
@@ -85,11 +74,7 @@ export class SocketManager {
                     tokens.forEach(token => {
                         socket.leave(`token_${token}`);
                     });
-                    
-                    // We don't necessarily unsubscribe from TickerService immediately 
-                    // because other clients might be interested. 
-                    // Optimization: Check room size before unsubscribing upstream.
-                    TickerService.unsubscribe(tokens); // Simplification for now
+                    TickerService.unsubscribe(tokens);
                 }
             });
 
@@ -98,15 +83,9 @@ export class SocketManager {
             });
         });
 
-        // Listen for internal Ticker events and broadcast
+        // Listen for internal Ticker events and broadcast to token rooms
         tickerEvents.on('ticks', (ticks: any[]) => {
-            if (ticks.length > 0) {
-                // logger.debug(`SocketManager: Broadcasting ${ticks.length} ticks`);
-            }
-            // Broadcast to the specific room for each token
             ticks.forEach(tick => {
-                // this.io.to(`token_${tick.instrument_token}`).emit('tick', tick); 
-                // Using .compress(false) might help latency but generally io.to is fine
                 this.io.to(`token_${tick.instrument_token}`).emit('tick', tick);
             });
         });
