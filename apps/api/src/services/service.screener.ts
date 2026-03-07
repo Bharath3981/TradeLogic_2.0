@@ -3,6 +3,7 @@ import { BrokerFactory, UserMode } from '../brokers/BrokerFactory';
 import type { Candle } from '../utils/technicalIndicators';
 import { getStrategy, getVersionMeta, DEFAULT_VERSION } from './screener/screener.registry';
 import type { ScreenerVersion } from './screener/screener.types';
+import { getIndexConstituents, getIndexNames } from './screener/nifty.indices';
 
 const FNO_SYMBOLS: { symbol: string; name: string; sector: string }[] = [
     { symbol: 'RELIANCE',   name: 'Reliance Industries',       sector: 'Energy' },
@@ -137,9 +138,18 @@ export const ScreenerService = {
         // Step 1 — resolve instrument tokens
         const tokenMap = await getInstrumentTokenMap(broker);
 
+        // Step 1 — apply universe filter (sector OR Nifty index)
         let stockList = FNO_SYMBOLS;
         if (sector && sector !== 'ALL') {
-            stockList = FNO_SYMBOLS.filter(s => s.sector === sector);
+            if (sector.startsWith('INDEX:')) {
+                // e.g. "INDEX:Nifty 50" → fetch live constituents from niftyindices.com
+                const indexName    = sector.slice('INDEX:'.length);
+                const constituents = await getIndexConstituents(indexName);
+                stockList          = FNO_SYMBOLS.filter(s => constituents.has(s.symbol));
+                logger.info({ msg: 'Filtered by Nifty index', index: indexName, matched: stockList.length });
+            } else {
+                stockList = FNO_SYMBOLS.filter(s => s.sector === sector);
+            }
         }
 
         const resolvedStocks = stockList
@@ -254,6 +264,10 @@ export const ScreenerService = {
 
     getVersions(): ScreenerVersion[] {
         return getVersionMeta();
+    },
+
+    getIndices(): string[] {
+        return getIndexNames();
     },
 
     clearTokenCache() {

@@ -81,6 +81,8 @@ export interface FuturesContract {
 export const screenerApi = {
     getVersions: () =>
         apiClient.get<{ success: boolean; data: ScreenerVersion[] }>('/screener/versions'),
+    getIndices: () =>
+        apiClient.get<{ success: boolean; data: string[] }>('/screener/indices'),
     runScan: (options: ScreenerScanOptions = {}) =>
         apiClient.post<{ success: boolean; data: ScreenerResult }>('/screener/scan', options),
     getSectors: () =>

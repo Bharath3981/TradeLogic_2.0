@@ -3,7 +3,7 @@ import {
     Box, Paper, Typography, Button, Select, MenuItem, FormControl,
     InputLabel, Chip, CircularProgress, Alert, Dialog, DialogContent,
     DialogTitle, IconButton, Table, TableBody, TableCell, TableHead,
-    TableRow, LinearProgress, Grid, Tooltip,
+    TableRow, LinearProgress, Grid, Tooltip, ListSubheader,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -344,16 +344,20 @@ function StockCard({ stock, onClick }: { stock: ScreenerStock; onClick: () => vo
 // ─── Main Screener Page ───────────────────────────────────────────────────────
 export function Screener() {
     const {
-        result, sectors, isScanning, error,
+        result, sectors, indices, isScanning, error,
         selectedSector, selectedTrend, holdingMonths, minScore, limit,
         availableVersions, selectedVersion,
-        runScan, fetchSectors, fetchVersions,
+        runScan, fetchSectors, fetchIndices, fetchVersions,
         setSelectedSector, setSelectedTrend, setHoldingMonths, setMinScore, setLimit,
         setSelectedVersion,
     } = useScreenerStore();
     const [selected, setSelected] = useState<ScreenerStock | null>(null);
 
-    useEffect(() => { fetchSectors(); fetchVersions(); }, [fetchSectors, fetchVersions]);
+    useEffect(() => {
+        fetchSectors();
+        fetchIndices();
+        fetchVersions();
+    }, [fetchSectors, fetchIndices, fetchVersions]);
 
     const selectedVersionMeta = availableVersions.find(v => v.id === selectedVersion);
 
@@ -415,9 +419,39 @@ export function Screener() {
                 <Grid container spacing={2} alignItems="flex-end">
                     <Grid size={{ xs: 12, sm: 6, md: 2 }}>
                         <FormControl fullWidth size="small">
-                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Sector</InputLabel>
-                            <Select value={selectedSector} label="Sector" onChange={e => setSelectedSector(e.target.value)} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>
-                                {sectors.length ? sectors.map(s => <MenuItem key={s} value={s} sx={{ fontFamily: 'monospace', fontSize: '13px' }}>{s}</MenuItem>) : <MenuItem value="ALL">ALL</MenuItem>}
+                            <InputLabel sx={{ fontFamily: 'monospace', fontSize: '12px' }}>Universe</InputLabel>
+                            <Select
+                                value={selectedSector}
+                                label="Universe"
+                                onChange={e => setSelectedSector(e.target.value)}
+                                sx={{ fontFamily: 'monospace', fontSize: '13px' }}
+                                MenuProps={{ PaperProps: { sx: { maxHeight: 400 } } }}
+                            >
+                                <MenuItem value="ALL" sx={{ fontFamily: 'monospace', fontSize: '13px' }}>All FNO Stocks</MenuItem>
+
+                                {/* ── Nifty Indices ── */}
+                                {indices.length > 0 && (
+                                    <ListSubheader sx={{ fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.15em', lineHeight: '28px', color: 'primary.main' }}>
+                                        NIFTY INDICES
+                                    </ListSubheader>
+                                )}
+                                {indices.map(idx => (
+                                    <MenuItem key={`INDEX:${idx}`} value={`INDEX:${idx}`} sx={{ fontFamily: 'monospace', fontSize: '13px', pl: 2.5 }}>
+                                        {idx}
+                                    </MenuItem>
+                                ))}
+
+                                {/* ── Sectors ── */}
+                                {sectors.filter(s => s !== 'ALL').length > 0 && (
+                                    <ListSubheader sx={{ fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.15em', lineHeight: '28px', color: 'primary.main' }}>
+                                        SECTORS
+                                    </ListSubheader>
+                                )}
+                                {sectors.filter(s => s !== 'ALL').map(s => (
+                                    <MenuItem key={s} value={s} sx={{ fontFamily: 'monospace', fontSize: '13px', pl: 2.5 }}>
+                                        {s}
+                                    </MenuItem>
+                                ))}
                             </Select>
                         </FormControl>
                     </Grid>

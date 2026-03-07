@@ -10,6 +10,7 @@ interface ScreenerState {
     // Data
     result:            ScreenerResult | null;
     sectors:           string[];
+    indices:           string[];
     availableVersions: ScreenerVersion[];
 
     // UI State
@@ -26,9 +27,10 @@ interface ScreenerState {
     selectedVersion: string;
 
     // Actions
-    runScan:           () => Promise<void>;
-    fetchSectors:      () => Promise<void>;
-    fetchVersions:     () => Promise<void>;
+    runScan:            () => Promise<void>;
+    fetchSectors:       () => Promise<void>;
+    fetchIndices:       () => Promise<void>;
+    fetchVersions:      () => Promise<void>;
     setSelectedSector:  (sector: string) => void;
     setSelectedTrend:   (trend: 'ALL' | 'uptrend' | 'downtrend' | 'sideways') => void;
     setHoldingMonths:   (months: number) => void;
@@ -42,6 +44,7 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
     // Data
     result:            null,
     sectors:           [],
+    indices:           [],
     availableVersions: [],
 
     // UI State
@@ -73,9 +76,7 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
             };
 
             const { data } = await screenerApi.runScan(options);
-            const result   = data.data;
-
-            set({ result, lastScanAt: new Date().toISOString(), isScanning: false });
+            set({ result: data.data, lastScanAt: new Date().toISOString(), isScanning: false });
         } catch (error: any) {
             console.error('Screener scan failed', error);
             set({
@@ -94,12 +95,20 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
         }
     },
 
+    fetchIndices: async () => {
+        try {
+            const { data } = await screenerApi.getIndices();
+            set({ indices: data.data || [] });
+        } catch (error) {
+            console.error('Failed to fetch indices', error);
+        }
+    },
+
     fetchVersions: async () => {
         try {
             const { data } = await screenerApi.getVersions();
             const versions = data.data || [];
             set({ availableVersions: versions });
-            // If current selectedVersion is not in the list, default to latest
             const { selectedVersion } = get();
             if (versions.length > 0 && !versions.find(v => v.id === selectedVersion)) {
                 const latest = versions.find(v => v.isLatest) ?? versions[0];

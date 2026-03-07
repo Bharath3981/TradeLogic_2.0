@@ -44,6 +44,15 @@ export const ScreenerController = {
         }
     },
 
+    async getIndices(req: Request, res: Response, next: NextFunction) {
+        try {
+            const indices = ScreenerService.getIndices();
+            sendSuccess(res, indices);
+        } catch (error) {
+            next(error);
+        }
+    },
+
     async getSectors(req: Request, res: Response, next: NextFunction) {
         try {
             const sectors = ScreenerService.getSectors();

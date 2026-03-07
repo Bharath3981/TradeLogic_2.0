@@ -1,9 +1,7 @@
 import { strategyV1 } from './versions/v1';
 import type { ScreenerVersion, ScoreStrategy } from './screener.types';
 
-// ─── UPDATE THIS to your actual GitHub repo URL ───────────────────────────────
-// e.g. https://github.com/bbaisetty/TradeLogic_2.0/blob/main/docs/screener
-const DOCS_BASE_URL = 'https://github.com/bbaisetty/TradeLogic_2.0/blob/main/docs/screener';
+const DOCS_BASE_URL = 'https://github.com/Bharath3981/TradeLogic_2.0/blob/main/docs/screener';
 
 interface VersionEntry extends ScreenerVersion {
     strategy: ScoreStrategy;
