@@ -261,31 +261,3 @@ export interface WatchlistItem {
   createdAt?: string; // Added from response
 }
 
-export type AuditAction = 'PLACE_ORDER' | 'MODIFY_ORDER' | 'CANCEL_ORDER';
-export type AuditStatus = 'SUCCESS' | 'FAILURE';
-
-export interface AuditLog {
-  id: string;
-  userId: string;
-  action: AuditAction;
-  tradeMode: TradingMode;
-  status: AuditStatus;
-  createdAt: string;
-  diff?: Record<string, unknown>; // Flexible for now, can be specific if needed
-  metadata?: Record<string, unknown>;
-}
-
-export interface AuditParams {
-  action?: string;
-  status?: string;
-  tradeMode?: string;
-  startDate?: string; // ISO Date
-  endDate?: string; // ISO Date
-}
-
-export interface Strategy {
-  id: string;
-  name: string;
-  description: string;
-  [key: string]: unknown;
-}
