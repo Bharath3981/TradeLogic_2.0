@@ -9,7 +9,6 @@ interface PortfolioState {
     day: Position[];
   };
   margins: Margin | null; // Add margins state
-  strategyPositions: Position[]; // Add strategy positions state
   isLoading: boolean;
   error: string | null;
 
@@ -17,18 +16,14 @@ interface PortfolioState {
   fetchPositions: () => Promise<void>;
   fetchHoldings: () => Promise<void>;
   fetchMargins: () => Promise<void>;
-  setStrategyPositions: (positions: Position[]) => void;
 }
 
 export const usePortfolioStore = create<PortfolioState>((set) => ({
   holdings: [],
   positions: { net: [], day: [] },
-  strategyPositions: [],
   margins: null,
   isLoading: false,
   error: null,
-
-  setStrategyPositions: (positions: Position[]) => set({ strategyPositions: positions }),
 
   fetchPositions: async () => {
     set({ isLoading: true, error: null });

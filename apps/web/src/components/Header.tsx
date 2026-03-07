@@ -207,7 +207,7 @@ const ProfileMenu = ({
 };
 
 // ─── ADD 'Screener' here — it auto-generates the route /screener ──────────────
-const pages = ['Dashboard', 'Holdings', 'Positions', 'Strategies', 'Option Strategies', 'Screener', 'Audit'];
+const pages = ['Dashboard', 'Holdings', 'Positions', 'Screener'];
 
 export const Header = () => {
   const navigate = useNavigate();

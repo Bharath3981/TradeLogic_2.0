@@ -22,8 +22,8 @@ apiClient.interceptors.request.use(
     if (config.url?.includes('/market/instruments') || config.url?.includes('/portfolio/profile')) {
        config.headers['x-trading-mode'] = 'REAL';
     } 
-    // Force MOCK for Watchlist, Audit
-    else if (config.url?.includes('/watchlist') || config.url?.includes('/audit')) {
+    // Force MOCK for Watchlist
+    else if (config.url?.includes('/watchlist')) {
        config.headers['x-trading-mode'] = 'MOCK';
     }
     // Default to User Selection for Orders, Positions, Strategies etc.

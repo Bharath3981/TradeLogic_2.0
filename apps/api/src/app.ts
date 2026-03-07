@@ -11,7 +11,6 @@ import { authenticate } from './middleware/middleware.auth';
 import { generateId } from './utils/id';
 import watchlistRouter from './routes/route.watchlist';
 import instrumentRoutes from './routes/route.instruments';
-import strategyRoutes from './routes/strategy.routes';
 import screenerRoutes from './routes/route.screener';
 import { config } from './config/config';
 
@@ -59,7 +58,6 @@ app.use('/api/watchlist', authenticate, watchlistRouter);
 app.use('/api/market', authenticate, marketRoutes);
 app.use('/api/kite', authenticate, kiteRoutes);
 app.use('/api/instruments', authenticate, instrumentRoutes);
-app.use('/api/strategies', authenticate, strategyRoutes);
 app.use('/api/screener', screenerRoutes);
 
 // Error Handler
