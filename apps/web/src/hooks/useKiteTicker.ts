@@ -4,9 +4,11 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useMarketStore } from '../store/useMarketStore';
 import { usePortfolioStore } from '../store/usePortfolioStore';
 
-// NSE Nifty 50 and BSE Sensex instrument tokens (static indices)
-const NIFTY_TOKEN = 256265;
-const SENSEX_TOKEN = 265;
+// Always-subscribed index tokens (Kite instrument tokens, static/stable)
+export const NIFTY_TOKEN       = 256265;   // NSE:NIFTY 50
+export const SENSEX_TOKEN      = 265;      // BSE:SENSEX
+export const BANK_NIFTY_TOKEN  = 260105;   // NSE:NIFTY BANK
+export const INDIA_VIX_TOKEN   = 264969;   // NSE:INDIA VIX
 
 export const useGlobalTicker = () => {
   const token = useAuthStore((state) => state.token);
@@ -24,7 +26,14 @@ export const useGlobalTicker = () => {
       ...(positions.day || []).map(p => Number(p.instrument_token)),
   ];
 
-  watchedTokens.push(...positionTokens, NIFTY_TOKEN, SENSEX_TOKEN);
+  // Always subscribe to major indices for Dashboard live feed
+  watchedTokens.push(
+      ...positionTokens,
+      NIFTY_TOKEN,
+      SENSEX_TOKEN,
+      BANK_NIFTY_TOKEN,
+      INDIA_VIX_TOKEN,
+  );
 
   const uniqueWatchedTokens = [...new Set(watchedTokens)];
 

@@ -9,6 +9,15 @@ export interface ScreenerVersion {
     isLatest:    boolean;
 }
 
+// ─── Optional per-stock context passed to v2+ strategies ─────────────────────
+export interface StrategyContext {
+    /** NSE ticker symbol (used by v2 to look up fundamental data) */
+    symbol?:            string;
+    /** Futures basis vs equity: +ve = contango (bullish), -ve = backwardation.
+     *  null when no futures contract is found in the instruments DB. */
+    futuresPremiumPct?: number | null;
+}
+
 // ─── Scoring Contract — what every version strategy must return ───────────────
 export interface StrategyResult {
     score:          number;
@@ -17,4 +26,5 @@ export interface StrategyResult {
     recommendation: 'STRONG BUY' | 'BUY' | 'WATCH' | 'NEUTRAL';
 }
 
-export type ScoreStrategy = (candles: Candle[], holdingMonths: number) => StrategyResult;
+// ctx is optional so v1 signature remains backward-compatible
+export type ScoreStrategy = (candles: Candle[], holdingMonths: number, ctx?: StrategyContext) => StrategyResult;

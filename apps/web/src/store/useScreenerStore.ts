@@ -58,7 +58,7 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
     holdingMonths:   3,
     minScore:        40,
     limit:           20,
-    selectedVersion: 'v1',
+    selectedVersion: 'v2',
 
     runScan: async () => {
         const { selectedSector, selectedTrend, holdingMonths, minScore, limit, selectedVersion } = get();
@@ -109,8 +109,8 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
             const { data } = await screenerApi.getVersions();
             const versions = data.data || [];
             set({ availableVersions: versions });
-            const { selectedVersion } = get();
-            if (versions.length > 0 && !versions.find(v => v.id === selectedVersion)) {
+            // Always prefer the isLatest version from the server to stay in sync
+            if (versions.length > 0) {
                 const latest = versions.find(v => v.isLatest) ?? versions[0];
                 set({ selectedVersion: latest.id });
             }

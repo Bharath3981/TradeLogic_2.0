@@ -1,4 +1,5 @@
 import { strategyV1 } from './versions/v1';
+import { strategyV2 } from './versions/v2';
 import type { ScreenerVersion, ScoreStrategy } from './screener.types';
 
 const DOCS_BASE_URL = 'https://github.com/Bharath3981/TradeLogic_2.0/blob/main/docs/screener';
@@ -14,13 +15,20 @@ const SCREENER_REGISTRY: Record<string, VersionEntry> = {
         label:       'v1 — Baseline',
         description: 'RSI · MACD · EMA (20/50/200) · Bollinger Bands · ADX · Stochastic · ATR · S/R · Pivot Points · Candlestick Patterns. Daily timeframe, 1-year lookback.',
         docUrl:      `${DOCS_BASE_URL}/v1.md`,
-        isLatest:    true,
+        isLatest:    false,
         strategy:    strategyV1,
     },
-    // v2: { id: 'v2', label: 'v2 — ...', description: '...', docUrl: `${DOCS_BASE_URL}/v2.md`, isLatest: false, strategy: strategyV2 },
+    v2: {
+        id:          'v2',
+        label:       'v2 — 3-Layer Analysis',
+        description: 'Fundamental (ROE · D/E · Promoter) + Technical (9 indicators) + Price Action & Derivatives confirmation. Score 0–100. Daily candles, 1-year lookback.',
+        docUrl:      `${DOCS_BASE_URL}/v2.md`,
+        isLatest:    true,
+        strategy:    strategyV2,
+    },
 };
 
-export const DEFAULT_VERSION = 'v1';
+export const DEFAULT_VERSION = 'v2';
 
 /** Returns version metadata list (strips the strategy fn — safe to send to client) */
 export function getVersionMeta(): ScreenerVersion[] {

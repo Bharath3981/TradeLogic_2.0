@@ -2,60 +2,119 @@ import { logger } from '../utils/logger';
 import { BrokerFactory, UserMode } from '../brokers/BrokerFactory';
 import type { Candle } from '../utils/technicalIndicators';
 import { getStrategy, getVersionMeta, DEFAULT_VERSION } from './screener/screener.registry';
-import type { ScreenerVersion } from './screener/screener.types';
+import type { ScreenerVersion, StrategyContext } from './screener/screener.types';
 import { getIndexConstituents, getIndexNames } from './screener/nifty.indices';
+import { InstrumentRepository } from '../repositories/repository.instrument';
 
 const FNO_SYMBOLS: { symbol: string; name: string; sector: string }[] = [
-    { symbol: 'RELIANCE',   name: 'Reliance Industries',       sector: 'Energy' },
-    { symbol: 'TCS',        name: 'Tata Consultancy Services', sector: 'IT' },
-    { symbol: 'HDFCBANK',   name: 'HDFC Bank',                 sector: 'Banking' },
-    { symbol: 'INFY',       name: 'Infosys',                   sector: 'IT' },
-    { symbol: 'ICICIBANK',  name: 'ICICI Bank',                sector: 'Banking' },
-    { symbol: 'HINDUNILVR', name: 'Hindustan Unilever',        sector: 'FMCG' },
-    { symbol: 'SBIN',       name: 'State Bank of India',       sector: 'Banking' },
-    { symbol: 'BHARTIARTL', name: 'Bharti Airtel',             sector: 'Telecom' },
-    { symbol: 'ITC',        name: 'ITC Limited',               sector: 'FMCG' },
-    { symbol: 'KOTAKBANK',  name: 'Kotak Mahindra Bank',       sector: 'Banking' },
-    { symbol: 'LT',         name: 'Larsen & Toubro',           sector: 'Infrastructure' },
-    { symbol: 'AXISBANK',   name: 'Axis Bank',                 sector: 'Banking' },
-    { symbol: 'ASIANPAINT', name: 'Asian Paints',              sector: 'Consumer' },
-    { symbol: 'MARUTI',     name: 'Maruti Suzuki',             sector: 'Auto' },
-    { symbol: 'TITAN',      name: 'Titan Company',             sector: 'Consumer' },
-    { symbol: 'SUNPHARMA',  name: 'Sun Pharma',                sector: 'Pharma' },
-    { symbol: 'WIPRO',      name: 'Wipro',                     sector: 'IT' },
-    { symbol: 'BAJFINANCE', name: 'Bajaj Finance',             sector: 'NBFC' },
-    { symbol: 'TATAMOTORS', name: 'Tata Motors',               sector: 'Auto' },
-    { symbol: 'HCLTECH',    name: 'HCL Technologies',          sector: 'IT' },
-    { symbol: 'NTPC',       name: 'NTPC',                      sector: 'Power' },
-    { symbol: 'ONGC',       name: 'ONGC',                      sector: 'Energy' },
-    { symbol: 'ADANIENT',   name: 'Adani Enterprises',         sector: 'Conglomerate' },
-    { symbol: 'ADANIPORTS', name: 'Adani Ports',               sector: 'Infrastructure' },
-    { symbol: 'JSWSTEEL',   name: 'JSW Steel',                 sector: 'Metals' },
-    { symbol: 'TATASTEEL',  name: 'Tata Steel',                sector: 'Metals' },
-    { symbol: 'HINDALCO',   name: 'Hindalco',                  sector: 'Metals' },
-    { symbol: 'TECHM',      name: 'Tech Mahindra',             sector: 'IT' },
-    { symbol: 'DRREDDY',    name: "Dr. Reddy's Labs",          sector: 'Pharma' },
-    { symbol: 'CIPLA',      name: 'Cipla',                     sector: 'Pharma' },
-    { symbol: 'BAJAJFINSV', name: 'Bajaj Finserv',             sector: 'NBFC' },
-    { symbol: 'EICHERMOT',  name: 'Eicher Motors',             sector: 'Auto' },
-    { symbol: 'HEROMOTOCO', name: 'Hero MotoCorp',             sector: 'Auto' },
-    { symbol: 'APOLLOHOSP', name: 'Apollo Hospitals',          sector: 'Healthcare' },
-    { symbol: 'TATACONSUM', name: 'Tata Consumer',             sector: 'FMCG' },
-    { symbol: 'BPCL',       name: 'BPCL',                      sector: 'Energy' },
-    { symbol: 'COALINDIA',  name: 'Coal India',                sector: 'Mining' },
-    { symbol: 'INDUSINDBK', name: 'IndusInd Bank',             sector: 'Banking' },
-    { symbol: 'M&M',        name: 'Mahindra & Mahindra',       sector: 'Auto' },
-    { symbol: 'BEL',        name: 'Bharat Electronics',        sector: 'Defence' },
-    { symbol: 'HAL',        name: 'Hindustan Aeronautics',     sector: 'Defence' },
-    { symbol: 'ZOMATO',     name: 'Zomato',                    sector: 'Consumer Tech' },
-    { symbol: 'TRENT',      name: 'Trent',                     sector: 'Retail' },
-    { symbol: 'GRASIM',     name: 'Grasim Industries',         sector: 'Cement' },
-    { symbol: 'ULTRACEMCO', name: 'UltraTech Cement',          sector: 'Cement' },
-    { symbol: 'DIVISLAB',   name: "Divi's Laboratories",       sector: 'Pharma' },
-    { symbol: 'NESTLEIND',  name: 'Nestle India',              sector: 'FMCG' },
-    { symbol: 'SHRIRAMFIN', name: 'Shriram Finance',           sector: 'NBFC' },
-    { symbol: 'POWERGRID',  name: 'Power Grid Corp',           sector: 'Power' },
-    { symbol: 'PAYTM',      name: 'Paytm',                     sector: 'Fintech' },
+    // ── ENERGY ──────────────────────────────────────────────────────────────
+    { symbol: 'RELIANCE',    name: 'Reliance Industries',       sector: 'Energy' },
+    { symbol: 'ONGC',        name: 'ONGC',                      sector: 'Energy' },
+    { symbol: 'BPCL',        name: 'BPCL',                      sector: 'Energy' },
+    { symbol: 'POWERGRID',   name: 'Power Grid Corp',           sector: 'Power' },
+    { symbol: 'NTPC',        name: 'NTPC',                      sector: 'Power' },
+    { symbol: 'COALINDIA',   name: 'Coal India',                sector: 'Mining' },
+    { symbol: 'TATAPOWER',   name: 'Tata Power',                sector: 'Power' },
+    { symbol: 'ADANIGREEN',  name: 'Adani Green Energy',        sector: 'Power' },
+
+    // ── IT ───────────────────────────────────────────────────────────────────
+    { symbol: 'TCS',         name: 'Tata Consultancy Services', sector: 'IT' },
+    { symbol: 'INFY',        name: 'Infosys',                   sector: 'IT' },
+    { symbol: 'WIPRO',       name: 'Wipro',                     sector: 'IT' },
+    { symbol: 'HCLTECH',     name: 'HCL Technologies',          sector: 'IT' },
+    { symbol: 'TECHM',       name: 'Tech Mahindra',             sector: 'IT' },
+    { symbol: 'LTI',         name: 'LTIMindtree',               sector: 'IT' },
+    { symbol: 'MPHASIS',     name: 'Mphasis',                   sector: 'IT' },
+
+    // ── BANKING ──────────────────────────────────────────────────────────────
+    { symbol: 'HDFCBANK',    name: 'HDFC Bank',                 sector: 'Banking' },
+    { symbol: 'ICICIBANK',   name: 'ICICI Bank',                sector: 'Banking' },
+    { symbol: 'SBIN',        name: 'State Bank of India',       sector: 'Banking' },
+    { symbol: 'KOTAKBANK',   name: 'Kotak Mahindra Bank',       sector: 'Banking' },
+    { symbol: 'AXISBANK',    name: 'Axis Bank',                 sector: 'Banking' },
+    { symbol: 'INDUSINDBK',  name: 'IndusInd Bank',             sector: 'Banking' },
+    { symbol: 'BANDHANBNK',  name: 'Bandhan Bank',              sector: 'Banking' },
+    { symbol: 'PNB',         name: 'Punjab National Bank',      sector: 'Banking' },
+    { symbol: 'CANBK',       name: 'Canara Bank',               sector: 'Banking' },
+
+    // ── NBFC ─────────────────────────────────────────────────────────────────
+    { symbol: 'BAJFINANCE',  name: 'Bajaj Finance',             sector: 'NBFC' },
+    { symbol: 'BAJAJFINSV',  name: 'Bajaj Finserv',             sector: 'NBFC' },
+    { symbol: 'SHRIRAMFIN',  name: 'Shriram Finance',           sector: 'NBFC' },
+
+    // ── FMCG ─────────────────────────────────────────────────────────────────
+    { symbol: 'HINDUNILVR',  name: 'Hindustan Unilever',        sector: 'FMCG' },
+    { symbol: 'ITC',         name: 'ITC Limited',               sector: 'FMCG' },
+    { symbol: 'NESTLEIND',   name: 'Nestle India',              sector: 'FMCG' },
+    { symbol: 'TATACONSUM',  name: 'Tata Consumer',             sector: 'FMCG' },
+    { symbol: 'BRITANNIA',   name: 'Britannia Industries',      sector: 'FMCG' },
+    { symbol: 'MARICO',      name: 'Marico',                    sector: 'FMCG' },
+
+    // ── AUTO ─────────────────────────────────────────────────────────────────
+    { symbol: 'MARUTI',      name: 'Maruti Suzuki',             sector: 'Auto' },
+    { symbol: 'TATAMOTORS',  name: 'Tata Motors',               sector: 'Auto' },
+    { symbol: 'EICHERMOT',   name: 'Eicher Motors',             sector: 'Auto' },
+    { symbol: 'HEROMOTOCO',  name: 'Hero MotoCorp',             sector: 'Auto' },
+    { symbol: 'M&M',         name: 'Mahindra & Mahindra',       sector: 'Auto' },
+    { symbol: 'BALKRISIND',  name: 'Balkrishna Industries',     sector: 'Auto' },
+
+    // ── INFRASTRUCTURE / ENGINEERING ─────────────────────────────────────────
+    { symbol: 'LT',          name: 'Larsen & Toubro',           sector: 'Infrastructure' },
+    { symbol: 'ADANIPORTS',  name: 'Adani Ports',               sector: 'Infrastructure' },
+    { symbol: 'ADANIENT',    name: 'Adani Enterprises',         sector: 'Conglomerate' },
+    { symbol: 'SIEMENS',     name: 'Siemens India',             sector: 'Conglomerate' },
+    { symbol: 'ABB',         name: 'ABB India',                 sector: 'Conglomerate' },
+    { symbol: 'HAVELLS',     name: 'Havells India',             sector: 'Conglomerate' },
+
+    // ── PHARMA / HEALTHCARE ──────────────────────────────────────────────────
+    { symbol: 'SUNPHARMA',   name: 'Sun Pharma',                sector: 'Pharma' },
+    { symbol: 'DRREDDY',     name: "Dr. Reddy's Labs",          sector: 'Pharma' },
+    { symbol: 'CIPLA',       name: 'Cipla',                     sector: 'Pharma' },
+    { symbol: 'DIVISLAB',    name: "Divi's Laboratories",       sector: 'Pharma' },
+    { symbol: 'APOLLOHOSP',  name: 'Apollo Hospitals',          sector: 'Healthcare' },
+    { symbol: 'TORNTPHARM',  name: 'Torrent Pharma',            sector: 'Pharma' },
+    { symbol: 'LUPIN',       name: 'Lupin',                     sector: 'Pharma' },
+
+    // ── METALS / MINING ──────────────────────────────────────────────────────
+    { symbol: 'JSWSTEEL',    name: 'JSW Steel',                 sector: 'Metals' },
+    { symbol: 'TATASTEEL',   name: 'Tata Steel',                sector: 'Metals' },
+    { symbol: 'HINDALCO',    name: 'Hindalco',                  sector: 'Metals' },
+    { symbol: 'VEDL',        name: 'Vedanta',                   sector: 'Metals' },
+
+    // ── CONSUMER / RETAIL ────────────────────────────────────────────────────
+    { symbol: 'ASIANPAINT',  name: 'Asian Paints',              sector: 'Consumer' },
+    { symbol: 'TITAN',       name: 'Titan Company',             sector: 'Consumer' },
+    { symbol: 'TRENT',       name: 'Trent',                     sector: 'Retail' },
+    { symbol: 'DMART',       name: 'Avenue Supermarts (DMart)', sector: 'Retail' },
+
+    // ── TELECOM ───────────────────────────────────────────────────────────────
+    { symbol: 'BHARTIARTL',  name: 'Bharti Airtel',             sector: 'Telecom' },
+
+    // ── CONSUMER TECH / FINTECH ───────────────────────────────────────────────
+    { symbol: 'ZOMATO',      name: 'Zomato',                    sector: 'Consumer Tech' },
+    { symbol: 'PAYTM',       name: 'Paytm',                     sector: 'Fintech' },
+
+    // ── CEMENT ────────────────────────────────────────────────────────────────
+    { symbol: 'ULTRACEMCO',  name: 'UltraTech Cement',          sector: 'Cement' },
+    { symbol: 'GRASIM',      name: 'Grasim Industries',         sector: 'Cement' },
+    { symbol: 'ACC',         name: 'ACC Limited',               sector: 'Cement' },
+    { symbol: 'AMBUJACEM',   name: 'Ambuja Cements',            sector: 'Cement' },
+
+    // ── DEFENCE ──────────────────────────────────────────────────────────────
+    { symbol: 'BEL',         name: 'Bharat Electronics',        sector: 'Defence' },
+    { symbol: 'HAL',         name: 'Hindustan Aeronautics',     sector: 'Defence' },
+    { symbol: 'BHEL',        name: 'Bharat Heavy Electricals',  sector: 'Defence' },
+
+    // ── INSURANCE ────────────────────────────────────────────────────────────
+    { symbol: 'HDFCLIFE',    name: 'HDFC Life Insurance',       sector: 'Insurance' },
+    { symbol: 'SBILIFE',     name: 'SBI Life Insurance',        sector: 'Insurance' },
+
+    // ── FINANCIAL INFRA ───────────────────────────────────────────────────────
+    { symbol: 'BSE',         name: 'BSE Limited',               sector: 'Fintech' },
+
+    // ── REALTY ────────────────────────────────────────────────────────────────
+    { symbol: 'DLF',         name: 'DLF Limited',               sector: 'Realty' },
+    { symbol: 'GODREJPROP',  name: 'Godrej Properties',         sector: 'Realty' },
 ];
 
 export interface ScreenerStock {
@@ -105,6 +164,34 @@ async function getInstrumentTokenMap(broker: any): Promise<Map<string, number>> 
     return map;
 }
 
+// ─── Fetch futures premium for a stock symbol (v2 only) ──────────────────────
+async function getFuturesPremiumPct(
+    broker:       any,
+    symbol:       string,
+    equityPrice:  number,
+): Promise<number | null> {
+    try {
+        const contracts = await InstrumentRepository.findUpcomingFutures(symbol);
+        if (!contracts || contracts.length === 0) return null;
+
+        // Take the nearest expiry contract
+        const nearest = contracts[0];
+        if (!nearest.tradingsymbol) return null;
+
+        const ltpKey  = `NFO:${nearest.tradingsymbol}`;
+        const ltpData = await broker.getLTP([ltpKey]);
+        const entry   = ltpData?.[ltpKey] || Object.values(ltpData || {})[0] as any;
+        const futLTP  = entry?.last_price;
+
+        if (!futLTP || equityPrice === 0) return null;
+
+        return ((futLTP - equityPrice) / equityPrice) * 100;
+    } catch (err: any) {
+        logger.warn({ msg: `Futures premium fetch failed for ${symbol}`, error: err?.message });
+        return null;
+    }
+}
+
 export const ScreenerService = {
 
     async runScan(
@@ -132,13 +219,14 @@ export const ScreenerService = {
 
         // Resolve scoring strategy — throws AppError-compatible if version is unknown
         const strategy = getStrategy(version);
+        const isV2     = version === 'v2';
 
         const broker = BrokerFactory.getBroker(UserMode.REAL, userId, accessToken);
 
         // Step 1 — resolve instrument tokens
         const tokenMap = await getInstrumentTokenMap(broker);
 
-        // Step 1 — apply universe filter (sector OR Nifty index)
+        // Step 2 — apply universe filter (sector OR Nifty index)
         let stockList = FNO_SYMBOLS;
         if (sector && sector !== 'ALL') {
             if (sector.startsWith('INDEX:')) {
@@ -169,7 +257,7 @@ export const ScreenerService = {
         const fromDate = new Date();
         fromDate.setFullYear(fromDate.getFullYear() - 1);
 
-        // Step 2 — fetch historical data in batches of 3 (respect Kite rate limits)
+        // Step 3 — fetch historical data in batches of 3 (respect Kite rate limits)
         const BATCH_SIZE = 3;
 
         for (let i = 0; i < resolvedStocks.length; i += BATCH_SIZE) {
@@ -204,9 +292,17 @@ export const ScreenerService = {
                             volume: Number(c.volume),
                         }));
 
-                        // ── Delegate scoring to the selected version strategy ──
-                        const scored       = strategy(candles, holdingMonths);
                         const currentPrice = candles[candles.length - 1].close;
+
+                        // ── Build strategy context (v2 needs symbol + futures premium) ──
+                        let ctx: StrategyContext | undefined;
+                        if (isV2) {
+                            const futuresPremiumPct = await getFuturesPremiumPct(broker, stock.symbol, currentPrice);
+                            ctx = { symbol: stock.symbol, futuresPremiumPct };
+                        }
+
+                        // ── Delegate scoring to the selected version strategy ──
+                        const scored = strategy(candles, holdingMonths, ctx);
 
                         logger.info({ msg: 'Score', symbol: stock.symbol, score: scored.score, version });
 
