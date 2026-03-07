@@ -24,6 +24,13 @@ export const UserRepository = {
         });
     },
 
+    async clearKiteToken(userId: string) {
+        return await prisma.user.update({
+            where: { id: userId },
+            data: { kiteAccessToken: null }
+        });
+    },
+
     async findById(id: string) {
          return await prisma.user.findUnique({ where: { id } });
     }

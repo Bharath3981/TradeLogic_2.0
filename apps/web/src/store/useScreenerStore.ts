@@ -4,75 +4,78 @@
  */
 
 import { create } from 'zustand';
-import { screenerApi, type ScreenerResult, type ScreenerScanOptions, } from '../api/screener';
+import { screenerApi, type ScreenerResult, type ScreenerScanOptions, type ScreenerVersion } from '../api/screener';
 
 interface ScreenerState {
     // Data
-    result: ScreenerResult | null;
-    sectors: string[];
+    result:            ScreenerResult | null;
+    sectors:           string[];
+    availableVersions: ScreenerVersion[];
 
     // UI State
     isScanning: boolean;
-    error: string | null;
+    error:      string | null;
     lastScanAt: string | null;
 
     // Filters
-    selectedSector: string;
-    selectedTrend: 'ALL' | 'uptrend' | 'downtrend' | 'sideways';
-    holdingMonths: number;
-    minScore: number;
-    limit: number;
+    selectedSector:  string;
+    selectedTrend:   'ALL' | 'uptrend' | 'downtrend' | 'sideways';
+    holdingMonths:   number;
+    minScore:        number;
+    limit:           number;
+    selectedVersion: string;
 
     // Actions
-    runScan: () => Promise<void>;
-    fetchSectors: () => Promise<void>;
-    setSelectedSector: (sector: string) => void;
-    setSelectedTrend: (trend: 'ALL' | 'uptrend' | 'downtrend' | 'sideways') => void;
-    setHoldingMonths: (months: number) => void;
-    setMinScore: (score: number) => void;
-    setLimit: (limit: number) => void;
-    clearResults: () => void;
+    runScan:           () => Promise<void>;
+    fetchSectors:      () => Promise<void>;
+    fetchVersions:     () => Promise<void>;
+    setSelectedSector:  (sector: string) => void;
+    setSelectedTrend:   (trend: 'ALL' | 'uptrend' | 'downtrend' | 'sideways') => void;
+    setHoldingMonths:   (months: number) => void;
+    setMinScore:        (score: number) => void;
+    setLimit:           (limit: number) => void;
+    setSelectedVersion: (version: string) => void;
+    clearResults:       () => void;
 }
 
 export const useScreenerStore = create<ScreenerState>((set, get) => ({
     // Data
-    result: null,
-    sectors: [],
+    result:            null,
+    sectors:           [],
+    availableVersions: [],
 
     // UI State
     isScanning: false,
-    error: null,
+    error:      null,
     lastScanAt: null,
 
     // Filters (defaults)
-    selectedSector: 'ALL',
-    selectedTrend: 'ALL',
-    holdingMonths: 3,
-    minScore: 40,
-    limit: 20,
+    selectedSector:  'ALL',
+    selectedTrend:   'ALL',
+    holdingMonths:   3,
+    minScore:        40,
+    limit:           20,
+    selectedVersion: 'v1',
 
     runScan: async () => {
-        const { selectedSector, selectedTrend, holdingMonths, minScore, limit } = get();
+        const { selectedSector, selectedTrend, holdingMonths, minScore, limit, selectedVersion } = get();
 
         set({ isScanning: true, error: null });
 
         try {
             const options: ScreenerScanOptions = {
-                sector: selectedSector,
-                trend: selectedTrend,
+                sector:  selectedSector,
+                trend:   selectedTrend,
                 holdingMonths,
                 minScore,
                 limit,
+                version: selectedVersion,
             };
 
             const { data } = await screenerApi.runScan(options);
-            const result = data.data;
+            const result   = data.data;
 
-            set({
-                result,
-                lastScanAt: new Date().toISOString(),
-                isScanning: false,
-            });
+            set({ result, lastScanAt: new Date().toISOString(), isScanning: false });
         } catch (error: any) {
             console.error('Screener scan failed', error);
             set({
@@ -91,11 +94,28 @@ export const useScreenerStore = create<ScreenerState>((set, get) => ({
         }
     },
 
-    setSelectedSector: (sector) => set({ selectedSector: sector }),
-    setSelectedTrend: (trend) => set({ selectedTrend: trend }),
-    setHoldingMonths: (months) => set({ holdingMonths: months }),
-    setMinScore: (score) => set({ minScore: score }),
-    setLimit: (limit) => set({ limit }),
+    fetchVersions: async () => {
+        try {
+            const { data } = await screenerApi.getVersions();
+            const versions = data.data || [];
+            set({ availableVersions: versions });
+            // If current selectedVersion is not in the list, default to latest
+            const { selectedVersion } = get();
+            if (versions.length > 0 && !versions.find(v => v.id === selectedVersion)) {
+                const latest = versions.find(v => v.isLatest) ?? versions[0];
+                set({ selectedVersion: latest.id });
+            }
+        } catch (error) {
+            console.error('Failed to fetch screener versions', error);
+        }
+    },
+
+    setSelectedSector:  (sector)  => set({ selectedSector: sector }),
+    setSelectedTrend:   (trend)   => set({ selectedTrend: trend }),
+    setHoldingMonths:   (months)  => set({ holdingMonths: months }),
+    setMinScore:        (score)   => set({ minScore: score }),
+    setLimit:           (limit)   => set({ limit }),
+    setSelectedVersion: (version) => set({ selectedVersion: version }),
 
     clearResults: () => set({ result: null, error: null, lastScanAt: null }),
 }));

@@ -3,9 +3,10 @@ import {
     Box, Paper, Typography, Button, Select, MenuItem, FormControl,
     InputLabel, Chip, CircularProgress, Alert, Dialog, DialogContent,
     DialogTitle, IconButton, Table, TableBody, TableCell, TableHead,
-    TableRow, LinearProgress, Grid,
+    TableRow, LinearProgress, Grid, Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useTheme } from '@mui/material/styles';
 import { useScreenerStore } from '../store/useScreenerStore';
 import type { ScreenerStock, SRLevel, FuturesContract } from '../api/screener';
@@ -345,12 +346,16 @@ export function Screener() {
     const {
         result, sectors, isScanning, error,
         selectedSector, selectedTrend, holdingMonths, minScore, limit,
-        runScan, fetchSectors,
+        availableVersions, selectedVersion,
+        runScan, fetchSectors, fetchVersions,
         setSelectedSector, setSelectedTrend, setHoldingMonths, setMinScore, setLimit,
+        setSelectedVersion,
     } = useScreenerStore();
     const [selected, setSelected] = useState<ScreenerStock | null>(null);
 
-    useEffect(() => { fetchSectors(); }, [fetchSectors]);
+    useEffect(() => { fetchSectors(); fetchVersions(); }, [fetchSectors, fetchVersions]);
+
+    const selectedVersionMeta = availableVersions.find(v => v.id === selectedVersion);
 
     const fmtDuration = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 
@@ -362,11 +367,46 @@ export function Screener() {
             {/* Header */}
             <Box sx={{ mb: 3, pb: 2, borderBottom: 1, borderColor: 'divider' }}>
                 <Typography sx={{ fontFamily: 'monospace', fontSize: '11px', letterSpacing: '0.25em', color: 'primary.main', mb: '4px', textTransform: 'uppercase' }}>// Technical Analysis</Typography>
-                <Typography variant="h4" sx={{ fontFamily: 'monospace', fontWeight: 900, letterSpacing: '0.04em' }}>
-                    Futures <Box component="span" sx={{ color: 'primary.main' }}>Screener</Box>
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Typography variant="h4" sx={{ fontFamily: 'monospace', fontWeight: 900, letterSpacing: '0.04em' }}>
+                        Futures <Box component="span" sx={{ color: 'primary.main' }}>Screener</Box>
+                    </Typography>
+
+                    {/* Version dropdown */}
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <Select
+                            value={selectedVersion}
+                            onChange={e => setSelectedVersion(e.target.value)}
+                            sx={{ fontFamily: 'monospace', fontSize: '12px' }}
+                            disabled={availableVersions.length === 0}
+                        >
+                            {availableVersions.length > 0
+                                ? availableVersions.map(v => (
+                                    <MenuItem key={v.id} value={v.id} sx={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                                        {v.label}{v.isLatest ? ' ✦' : ''}
+                                    </MenuItem>
+                                ))
+                                : <MenuItem value="v1" sx={{ fontFamily: 'monospace', fontSize: '12px' }}>v1 — Baseline ✦</MenuItem>
+                            }
+                        </Select>
+                    </FormControl>
+
+                    {/* Docs link icon */}
+                    {selectedVersionMeta?.docUrl && (
+                        <Tooltip title={`View ${selectedVersionMeta.label} documentation`} placement="right">
+                            <IconButton
+                                size="small"
+                                onClick={() => window.open(selectedVersionMeta.docUrl, '_blank', 'noopener,noreferrer')}
+                                sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                            >
+                                <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                </Box>
+
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    RSI · MACD · EMA · Bollinger · ADX · Stochastic · ATR · Support/Resistance · Pivot Points · Candlestick Patterns
+                    {selectedVersionMeta?.description ?? 'RSI · MACD · EMA · Bollinger · ADX · Stochastic · ATR · Support/Resistance · Pivot Points · Candlestick Patterns'}
                 </Typography>
             </Box>
 

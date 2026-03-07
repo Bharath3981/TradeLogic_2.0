@@ -1,6 +1,8 @@
 import { logger } from '../utils/logger';
 import { BrokerFactory, UserMode } from '../brokers/BrokerFactory';
-import { analyzeStock, Candle } from '../utils/technicalIndicators';
+import type { Candle } from '../utils/technicalIndicators';
+import { getStrategy, getVersionMeta, DEFAULT_VERSION } from './screener/screener.registry';
+import type { ScreenerVersion } from './screener/screener.types';
 
 const FNO_SYMBOLS: { symbol: string; name: string; sector: string }[] = [
     { symbol: 'RELIANCE',   name: 'Reliance Industries',       sector: 'Energy' },
@@ -56,43 +58,27 @@ const FNO_SYMBOLS: { symbol: string; name: string; sector: string }[] = [
 ];
 
 export interface ScreenerStock {
-    symbol: string;
-    name: string;
-    sector: string;
-    currentPrice: number;
-    score: number;
-    signals: string[];
-    indicators: {
-        rsi:            { value: number; signal: string };
-        macd:           { signal: string; histogram: number; momentum: string };
-        ema:            { ema20: number; ema50: number; ema200: number; signal: string };
-        bollingerBands: { upper: number; middle: number; lower: number; signal: string };
-        adx:            { value: number; plusDI: number; minusDI: number; signal: string };
-        volume:         { signal: string; ratio: number; direction: string };
-        fiftyTwoWeek:   { high: number; low: number; currentPct: number; isBreakout: boolean; signal: string };
-        stochastic:     { k: number; d: number; signal: string };
-        atr:            { value: number; pct: number };
-        supportResistance: {
-            levels:             { price: number; type: string; source: string; strength: string; touchCount: number }[];
-            nearestSupport:     number;
-            nearestResistance:  number;
-            riskRewardRatio:    number;
-            pricePosition:      string;
-            signal:             string;
-        };
-        pivotPoints:    { pp: number; r1: number; r2: number; r3: number; s1: number; s2: number; s3: number };
-        candlePattern:  { pattern: string; signal: string };
-        trendStrength:  { direction: string; strength: string };
-    };
+    symbol:         string;
+    name:           string;
+    sector:         string;
+    currentPrice:   number;
+    score:          number;
+    signals:        string[];
+    indicators:     Record<string, any>;
     recommendation: 'STRONG BUY' | 'BUY' | 'WATCH' | 'NEUTRAL';
+    version:        string;
 }
 
 export interface ScreenerResult {
-    stocks: ScreenerStock[];
-    scannedAt: string;
-    totalScanned: number;
+    stocks:         ScreenerStock[];
+    scannedAt:      string;
+    totalScanned:   number;
     scanDurationMs: number;
+    version:        string;
 }
+
+// Re-export so controller can use without reaching into the screener/ subdirectory
+export type { ScreenerVersion };
 
 // ─── Token cache — fetched once per process lifetime ─────────────────────────
 let tokenCache: Map<string, number> | null = null;
@@ -108,7 +94,6 @@ async function getInstrumentTokenMap(broker: any): Promise<Map<string, number>> 
 
     const map = new Map<string, number>();
     for (const inst of instruments) {
-        // We want EQ segment only for historical data
         if (inst.segment === 'NSE' && inst.instrument_type === 'EQ') {
             map.set(inst.tradingsymbol, inst.instrument_token);
         }
@@ -124,14 +109,32 @@ export const ScreenerService = {
     async runScan(
         userId: string,
         accessToken: string | undefined,
-        options: { sector?: string; minScore?: number; limit?: number; trend?: string; holdingMonths?: number } = {}
+        options: {
+            sector?:        string;
+            minScore?:      number;
+            limit?:         number;
+            trend?:         string;
+            holdingMonths?: number;
+            version?:       string;
+        } = {}
     ): Promise<ScreenerResult> {
 
         const startTime = Date.now();
-        const { sector, minScore = 40, limit = 20, trend = 'ALL', holdingMonths = 3 } = options;
+        const {
+            sector,
+            minScore      = 40,
+            limit         = 20,
+            trend         = 'ALL',
+            holdingMonths = 3,
+            version       = DEFAULT_VERSION,
+        } = options;
+
+        // Resolve scoring strategy — throws AppError-compatible if version is unknown
+        const strategy = getStrategy(version);
+
         const broker = BrokerFactory.getBroker(UserMode.REAL, userId, accessToken);
 
-        // Step 1 — get correct instrument tokens from Kite dynamically
+        // Step 1 — resolve instrument tokens
         const tokenMap = await getInstrumentTokenMap(broker);
 
         let stockList = FNO_SYMBOLS;
@@ -139,25 +142,24 @@ export const ScreenerService = {
             stockList = FNO_SYMBOLS.filter(s => s.sector === sector);
         }
 
-        // Step 2 — resolve tokens, skip any symbols not found
         const resolvedStocks = stockList
             .map(s => ({ ...s, token: tokenMap.get(s.symbol) }))
             .filter(s => {
                 if (!s.token) {
-                    logger.warn({ msg: `Token not found for symbol — skipping`, symbol: s.symbol });
+                    logger.warn({ msg: 'Token not found for symbol — skipping', symbol: s.symbol });
                     return false;
                 }
                 return true;
             }) as ({ symbol: string; name: string; sector: string; token: number })[];
 
-        logger.info({ msg: 'Screener scan started', total: resolvedStocks.length, trend, holdingMonths });
+        logger.info({ msg: 'Screener scan started', total: resolvedStocks.length, trend, holdingMonths, version });
 
         const results: ScreenerStock[] = [];
         const toDate   = new Date();
         const fromDate = new Date();
         fromDate.setFullYear(fromDate.getFullYear() - 1);
 
-        // Step 3 — fetch historical data in batches of 3
+        // Step 2 — fetch historical data in batches of 3 (respect Kite rate limits)
         const BATCH_SIZE = 3;
 
         for (let i = 0; i < resolvedStocks.length; i += BATCH_SIZE) {
@@ -166,7 +168,7 @@ export const ScreenerService = {
             const batchResults = await Promise.allSettled(
                 batch.map(async (stock) => {
                     try {
-                        logger.info({ msg: `Fetching`, symbol: stock.symbol, token: stock.token });
+                        logger.info({ msg: 'Fetching', symbol: stock.symbol, token: stock.token });
 
                         const historicalData = await (broker as any).getHistoricalData(
                             stock.token,
@@ -176,10 +178,10 @@ export const ScreenerService = {
                             false
                         );
 
-                        logger.info({ msg: `Candles received`, symbol: stock.symbol, count: historicalData?.length });
+                        logger.info({ msg: 'Candles received', symbol: stock.symbol, count: historicalData?.length });
 
                         if (!historicalData || historicalData.length < 50) {
-                            logger.warn({ msg: `Insufficient candles — skipping`, symbol: stock.symbol, count: historicalData?.length });
+                            logger.warn({ msg: 'Insufficient candles — skipping', symbol: stock.symbol, count: historicalData?.length });
                             return null;
                         }
 
@@ -192,43 +194,22 @@ export const ScreenerService = {
                             volume: Number(c.volume),
                         }));
 
-                        const analysis    = analyzeStock(candles, holdingMonths);
+                        // ── Delegate scoring to the selected version strategy ──
+                        const scored       = strategy(candles, holdingMonths);
                         const currentPrice = candles[candles.length - 1].close;
 
-                        logger.info({ msg: `Score`, symbol: stock.symbol, score: analysis.score });
+                        logger.info({ msg: 'Score', symbol: stock.symbol, score: scored.score, version });
 
                         return {
-                            symbol:      stock.symbol,
-                            name:        stock.name,
-                            sector:      stock.sector,
+                            symbol:         stock.symbol,
+                            name:           stock.name,
+                            sector:         stock.sector,
                             currentPrice,
-                            score:       analysis.score,
-                            signals:     analysis.signals,
-                            indicators: {
-                                rsi:            { value: analysis.rsi.value,    signal: analysis.rsi.signal },
-                                macd:           { signal: analysis.macd.signal, histogram: analysis.macd.histogram, momentum: analysis.macd.momentum },
-                                ema:            { ema20: analysis.ema.ema20,    ema50: analysis.ema.ema50, ema200: analysis.ema.ema200, signal: analysis.ema.signal },
-                                bollingerBands: { upper: analysis.bollingerBands.upper, middle: analysis.bollingerBands.middle, lower: analysis.bollingerBands.lower, signal: analysis.bollingerBands.signal },
-                                adx:            { value: analysis.adx.value, plusDI: analysis.adx.plusDI, minusDI: analysis.adx.minusDI, signal: analysis.adx.signal },
-                                volume: {
-                                    signal:    analysis.volume.signal,
-                                    ratio:     analysis.volume.avg20 > 0
-                                        ? analysis.volume.current / analysis.volume.avg20
-                                        : 1,
-                                    direction: analysis.volume.direction,
-                                },
-                                fiftyTwoWeek:   { high: analysis.fiftyTwoWeek.high, low: analysis.fiftyTwoWeek.low, currentPct: analysis.fiftyTwoWeek.currentPct, isBreakout: analysis.fiftyTwoWeek.isBreakout, signal: analysis.fiftyTwoWeek.signal },
-                                stochastic:     analysis.stochastic,
-                                atr:            analysis.atr,
-                                supportResistance: analysis.supportResistance,
-                                pivotPoints:    analysis.pivotPoints,
-                                candlePattern:  analysis.candlePattern,
-                                trendStrength:  analysis.trendStrength,
-                            },
-                            recommendation:
-                                analysis.score >= 75 ? 'STRONG BUY' :
-                                analysis.score >= 60 ? 'BUY'        :
-                                analysis.score >= 45 ? 'WATCH'      : 'NEUTRAL',
+                            score:          scored.score,
+                            signals:        scored.signals,
+                            indicators:     scored.indicators,
+                            recommendation: scored.recommendation,
+                            version,
                         } as ScreenerStock;
 
                     } catch (err: any) {
@@ -249,16 +230,17 @@ export const ScreenerService = {
         }
 
         const filtered = results
-            .filter(s => trend === 'ALL' || s.indicators.trendStrength.direction === trend)
+            .filter(s => trend === 'ALL' || s.indicators.trendStrength?.direction === trend)
             .filter(s => s.score >= minScore)
             .sort((a, b) => b.score - a.score)
             .slice(0, limit);
 
         logger.info({
-            msg:            'Screener scan complete',
-            totalAnalyzed:  results.length,
-            filtered:       filtered.length,
-            durationMs:     Date.now() - startTime,
+            msg:           'Screener scan complete',
+            totalAnalyzed: results.length,
+            filtered:      filtered.length,
+            durationMs:    Date.now() - startTime,
+            version,
         });
 
         return {
@@ -266,10 +248,14 @@ export const ScreenerService = {
             scannedAt:      new Date().toISOString(),
             totalScanned:   results.length,
             scanDurationMs: Date.now() - startTime,
+            version,
         };
     },
 
-    // Clear token cache (call if instruments seem stale)
+    getVersions(): ScreenerVersion[] {
+        return getVersionMeta();
+    },
+
     clearTokenCache() {
         tokenCache = null;
         logger.info({ msg: 'Instrument token cache cleared' });

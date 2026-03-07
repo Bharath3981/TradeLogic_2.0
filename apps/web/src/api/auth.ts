@@ -11,6 +11,9 @@ export const authApi = {
   logout: async () => {
     return apiClient.post('/logout');
   },
+  disconnectKite: async () => {
+    return apiClient.post('/kite/disconnect');
+  },
   kiteCallback: async (params: { request_token: string }) => {
     return apiClient.post('/kite/login/callback', params);
   },

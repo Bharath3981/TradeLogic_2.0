@@ -10,19 +10,18 @@ const SENSEX_TOKEN = 265;
 
 export const useGlobalTicker = () => {
   const token = useAuthStore((state) => state.token);
+  const isKiteConnected = useAuthStore((state) => state.isKiteConnected);
   const instruments = useAuthStore((state) => state.instruments);
   const watchlists = useMarketStore((state) => state.watchlists);
   const setTick = useMarketStore((state) => state.setTick);
 
-  const positions = usePortfolioStore((state) => state.positions);
-  const strategyPositions = usePortfolioStore((state) => state.strategyPositions);
+  const positions = usePortfolioStore((state) => state.positions) || { net: [], day: [] };
 
   const watchedTokens = Object.values(watchlists).flat();
 
   const positionTokens = [
-      ...positions.net.map(p => Number(p.instrument_token)),
-      ...positions.day.map(p => Number(p.instrument_token)),
-      ...strategyPositions.map(p => Number(p.instrument_token))
+      ...(positions.net || []).map(p => Number(p.instrument_token)),
+      ...(positions.day || []).map(p => Number(p.instrument_token)),
   ];
 
   watchedTokens.push(...positionTokens, NIFTY_TOKEN, SENSEX_TOKEN);
@@ -33,17 +32,20 @@ export const useGlobalTicker = () => {
 
   // 1. Connection Management
   useEffect(() => {
-    if (!token) return;
+    if (!token || !isKiteConnected) {
+      socketManager.disconnect();
+      return;
+    }
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:9000/api';
     const socketUrl = apiUrl.replace('/api', '');
 
     socketManager.connect(socketUrl, token);
-  }, [token]);
+  }, [token, isKiteConnected]);
 
   // 2. Subscription Management (Diffing)
   useEffect(() => {
-    if (!token) return;
+    if (!token || !isKiteConnected) return;
 
     const targetTokens = uniqueWatchedTokens;
     const prevTokens = prevSubscribedRef.current;
@@ -62,5 +64,5 @@ export const useGlobalTicker = () => {
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, uniqueWatchedTokens.join(','), instruments.length]);
+  }, [token, isKiteConnected, uniqueWatchedTokens.join(','), instruments.length]);
 };

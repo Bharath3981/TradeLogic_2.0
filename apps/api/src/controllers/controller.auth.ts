@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/service.auth';
 import { KiteCallbackDto, LoginDto } from '../dtos/dto.auth';
 import { sendSuccess } from '../utils/ApiResponse';
+import { UserRepository } from '../repositories/repository.user';
 
 export const AuthController = {
     getLoginUrl(req: Request, res: Response, next: NextFunction) {
@@ -37,6 +38,19 @@ export const AuthController = {
         // Stateless JWT: Client just deletes token.
         // Server could add to blacklist if needed, but for now just respond success.
         sendSuccess(res, { message: 'Logged out successfully' });
+    },
+
+    async disconnectKite(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = req.user?.id;
+            if (!userId) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            await UserRepository.clearKiteToken(userId);
+            sendSuccess(res, { message: 'Kite disconnected successfully' });
+        } catch (error) {
+            next(error);
+        }
     },
 
     async handleCallback(req: Request, res: Response, next: NextFunction) {

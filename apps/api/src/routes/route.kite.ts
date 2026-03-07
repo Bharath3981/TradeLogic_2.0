@@ -5,6 +5,7 @@ const router = Router();
 
 // These routes require Authentication (JWT)
 router.get('/login', AuthController.getLoginUrl);
+router.post('/disconnect', AuthController.disconnectKite);
 
 // Note: If accessed via Browser Redirect, this will fail 401 unless token is in cookie/query (unsupported by default middleware).
 // Ideally, Frontend handles redirect and POSTs to this endpoint with Bearer token.

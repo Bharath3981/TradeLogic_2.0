@@ -308,10 +308,16 @@ export const Header = () => {
                 <Button 
                     variant="contained" 
                     color={useAuthStore((state) => state.isKiteConnected) ? "error" : "primary"}
-                    onClick={() => {
+                    onClick={async () => {
                         const isConnected = useAuthStore.getState().isKiteConnected;
                         if (isConnected) {
-                            useAuthStore.getState().disconnectKite();
+                            try {
+                                await authApi.disconnectKite();
+                            } catch (error) {
+                                console.error('Kite disconnect failed', error);
+                            } finally {
+                                useAuthStore.getState().disconnectKite();
+                            }
                         } else {
                             const apiKey = import.meta.env.VITE_KITE_API_KEY;
                             if (apiKey) {
