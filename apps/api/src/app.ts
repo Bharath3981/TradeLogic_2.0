@@ -1,12 +1,17 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { logger } from './utils/logger';
-import { injectKiteToken } from './middleware/middleware.auth';
+import authRoutes from './routes/route.auth';
+import portfolioRoutes from './routes/route.portfolio';
+import marketRoutes from './routes/route.market';
+import kiteRoutes from './routes/route.kite';
+import { authenticate } from './middleware/middleware.auth';
 import { generateId } from './utils/id';
+import watchlistRouter from './routes/route.watchlist';
 import instrumentRoutes from './routes/route.instruments';
 import screenerRoutes from './routes/route.screener';
-import marketRoutes from './routes/route.market';
 import { config } from './config/config';
 
 const app = express();
@@ -37,9 +42,22 @@ app.use((req, res, next) => {
     });
 });
 
+// Rate limiter for auth endpoints — 20 requests per minute per IP
+const authLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests, please try again later.' } }
+});
+
 // Routes
-app.use('/api/market', injectKiteToken, marketRoutes);
-app.use('/api/instruments', injectKiteToken, instrumentRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/portfolio', authenticate, portfolioRoutes);
+app.use('/api/watchlist', authenticate, watchlistRouter);
+app.use('/api/market', authenticate, marketRoutes);
+app.use('/api/kite', authenticate, kiteRoutes);
+app.use('/api/instruments', authenticate, instrumentRoutes);
 app.use('/api/screener', screenerRoutes);
 
 // Error Handler

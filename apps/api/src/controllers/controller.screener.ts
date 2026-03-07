@@ -12,7 +12,7 @@ export const ScreenerController = {
     async runScan(req: Request, res: Response, next: NextFunction) {
         try {
             const userId = req.user?.id || 'guest';
-            // injectKiteToken middleware sets KITE_ACCESS_TOKEN from env on req.user.accessToken
+            // middleware.auth.ts decrypts kiteAccessToken from DB and sets it on req.user.accessToken
             const accessToken = req.user?.accessToken;
 
             if (!accessToken) {

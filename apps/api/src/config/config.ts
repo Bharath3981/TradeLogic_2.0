@@ -11,7 +11,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   KITE_API_KEY: z.string().min(1),
   KITE_API_SECRET: z.string().min(1),
-  KITE_ACCESS_TOKEN: z.string().min(1),
+  KITE_REDIRECT_URL: z.string().url(),
+  JWT_SECRET: z.string().min(1),
+  ENCRYPTION_KEY: z.string().length(64),
   ENABLE_MOCK_DATA: z.string().optional().default('false').transform(val => val === 'true'),
   ALLOWED_ORIGIN: z.string().url().optional().default('http://localhost:5173')
 });

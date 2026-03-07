@@ -1,9 +1,12 @@
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import { useAuthStore } from '../store/useAuthStore';
 import { useTheme } from '@mui/material/styles';
 
 export const Dashboard = () => {
+    const user = useAuthStore((state) => state.user);
     const theme = useTheme();
 
     return (
@@ -13,15 +16,15 @@ export const Dashboard = () => {
                     Dashboard
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
-                    Welcome back, Trader
+                    Welcome back, {user?.name || 'Trader'}
                 </Typography>
             </Box>
 
-            <Paper sx={{
-                p: 6,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
+            <Paper sx={{ 
+                p: 6, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
                 justifyContent: 'center',
                 minHeight: 400,
                 textAlign: 'center',
@@ -34,7 +37,7 @@ export const Dashboard = () => {
                     Coming Soon
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400 }}>
-                    We are working hard to bring you the best trading experience.
+                    We are working hard to bring you the best trading experience. 
                     Stay tuned for advanced analytics and portfolio tracking features!
                 </Typography>
             </Paper>
