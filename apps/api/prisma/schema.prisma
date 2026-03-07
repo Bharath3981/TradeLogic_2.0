@@ -7,69 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id
-  email     String   @unique
-  name      String?
-  password  String
-  kiteAccessToken String?  // Encrypted Kite Access Token
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  holdings  Holding[]
-  watchlist Watchlist[]
-  funds     Funds?
-}
-
-model Funds {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id])
-  availableCash   Float    @default(100000) // Default 1 Lakh for testing
-  utilizedMargin  Float    @default(0)
-  updatedAt       DateTime @updatedAt
-}
-
-// Models Order and Trade removed.
-
-
-model Holding {
-  id              String   @id @default(uuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  tradingsymbol   String
-  exchange        String
-  instrumentToken String?
-  quantity        Int
-  averagePrice    Float
-  product         String
-}
-
-model Watchlist {
-  id              String   @id
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  watchlistSet    Int      // 1 to 7
-  instrumentToken String
-  exchangeToken   String?
-  tradingsymbol   String
-  name            String?
-  lastPrice       Float    @default(0)
-  expiry          String?
-  strike          Float    @default(0)
-  tickSize        Float    @default(0)
-  lotSize         Int      @default(0)
-  instrumentType  String?
-  segment         String?
-  exchange        String
-  createdAt       DateTime @default(now())
-}
-
-
-// Models Position, AuditLog, and related Enums removed.
-
-
 model Instrument {
   id               Int     @id @default(autoincrement())
   instrument_token Int     @unique
@@ -77,7 +14,7 @@ model Instrument {
   tradingsymbol    String?
   name             String?
   last_price       Float?
-  expiry           DateTime? 
+  expiry           DateTime?
   strike           Float?
   tick_size        Float?
   lot_size         Int?
@@ -86,8 +23,3 @@ model Instrument {
   exchange         String?
   updatedAt        DateTime @updatedAt
 }
-
-
-
-// Strategy & Audit modules removed to keep the app lightweight.
-

@@ -2,13 +2,9 @@ import app from './app';
 import { createServer } from 'http';
 import { config } from './config/config';
 import { logger } from './utils/logger';
-import { SocketManager } from './socket/socket.manager';
 import { prisma } from './lib/prisma';
 
 const httpServer = createServer(app);
-
-// Initialize Socket Manager
-new SocketManager(httpServer);
 
 // Graceful shutdown
 const shutdown = async (signal: string) => {
