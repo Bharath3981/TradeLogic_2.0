@@ -1,4 +1,6 @@
-import type { Candle } from '../../utils/technicalIndicators';
+import type { Candle, TradeSetup } from '../../utils/technicalIndicators';
+
+export type { TradeSetup };
 
 // ─── Version Metadata ─────────────────────────────────────────────────────────
 export interface ScreenerVersion {
@@ -24,6 +26,8 @@ export interface StrategyResult {
     signals:        string[];
     indicators:     Record<string, any>;   // same shape as ScreenerStock.indicators
     recommendation: 'STRONG BUY' | 'BUY' | 'WATCH' | 'NEUTRAL';
+    /** Computed stop loss + target levels — see calculateTradeSetup() */
+    tradeSetup:     TradeSetup;
 }
 
 // ctx is optional so v1 signature remains backward-compatible

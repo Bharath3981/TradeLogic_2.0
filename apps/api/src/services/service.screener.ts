@@ -127,6 +127,7 @@ export interface ScreenerStock {
     indicators:     Record<string, any>;
     recommendation: 'STRONG BUY' | 'BUY' | 'WATCH' | 'NEUTRAL';
     version:        string;
+    tradeSetup:     import('./screener/screener.types').TradeSetup;
 }
 
 export interface ScreenerResult {
@@ -315,6 +316,7 @@ export const ScreenerService = {
                             signals:        scored.signals,
                             indicators:     scored.indicators,
                             recommendation: scored.recommendation,
+                            tradeSetup:     scored.tradeSetup,
                             version,
                         } as ScreenerStock;
 

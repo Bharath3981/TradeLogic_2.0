@@ -22,8 +22,8 @@
  *   NEUTRAL      < 42
  */
 
-import { analyzeStock }                    from '../../../utils/technicalIndicators';
-import type { Candle }                     from '../../../utils/technicalIndicators';
+import { analyzeStock, calculateTradeSetup } from '../../../utils/technicalIndicators';
+import type { Candle }                       from '../../../utils/technicalIndicators';
 import type { ScoreStrategy, StrategyResult, StrategyContext } from '../screener.types';
 import { FUNDAMENTAL_DATA }               from '../../../data/fundamentals';
 
@@ -176,8 +176,9 @@ export const strategyV2: ScoreStrategy = (
     ctx:           StrategyContext = {}
 ): StrategyResult => {
 
-    const symbol   = ctx.symbol ?? '';
-    const analysis = analyzeStock(candles, holdingMonths);
+    const symbol     = ctx.symbol ?? '';
+    const analysis   = analyzeStock(candles, holdingMonths);
+    const tradeSetup = calculateTradeSetup(candles, analysis, holdingMonths);
 
     // ── Score all three layers ──
     const l1 = scoreFundamentals(symbol);
@@ -202,6 +203,7 @@ export const strategyV2: ScoreStrategy = (
         score,
         signals:  [...l1.signals, ...l2.signals, ...l3.signals],
         recommendation,
+        tradeSetup,
         indicators: {
             // ── All v1 indicators (for compatibility with Screener.tsx display) ──
             rsi:            { value: analysis.rsi.value, signal: analysis.rsi.signal },

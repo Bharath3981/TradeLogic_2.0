@@ -17,13 +17,14 @@
  *   NEUTRAL      < 45
  */
 
-import { analyzeStock } from '../../../utils/technicalIndicators';
+import { analyzeStock, calculateTradeSetup } from '../../../utils/technicalIndicators';
 import type { Candle } from '../../../utils/technicalIndicators';
 import type { ScoreStrategy, StrategyResult } from '../screener.types';
 
 export const strategyV1: ScoreStrategy = (candles: Candle[], holdingMonths: number): StrategyResult => {
-    const analysis = analyzeStock(candles, holdingMonths);
-    const score    = analysis.score;
+    const analysis   = analyzeStock(candles, holdingMonths);
+    const score      = analysis.score;
+    const tradeSetup = calculateTradeSetup(candles, analysis, holdingMonths);
 
     const recommendation: StrategyResult['recommendation'] =
         score >= 75 ? 'STRONG BUY' :
@@ -34,6 +35,7 @@ export const strategyV1: ScoreStrategy = (candles: Candle[], holdingMonths: numb
         score,
         signals:  analysis.signals,
         recommendation,
+        tradeSetup,
         indicators: {
             rsi:            { value: analysis.rsi.value, signal: analysis.rsi.signal },
             macd:           { signal: analysis.macd.signal, histogram: analysis.macd.histogram, momentum: analysis.macd.momentum },

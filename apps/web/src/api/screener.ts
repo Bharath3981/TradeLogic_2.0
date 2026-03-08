@@ -1,5 +1,17 @@
 import apiClient from './client';
 
+export interface TradeSetup {
+    stopLoss:        number;
+    stopLossPct:     number;
+    target1:         number;
+    target1Pct:      number;
+    target2:         number;
+    target2Pct:      number;
+    riskRewardRatio: number;
+    stopLossBasis:   string;
+    targetBasis:     string;
+}
+
 export interface ScreenerVersion {
     id:          string;
     label:       string;
@@ -58,6 +70,7 @@ export interface ScreenerStock {
     indicators:     ScreenerStockIndicators;
     recommendation: 'STRONG BUY' | 'BUY' | 'WATCH' | 'NEUTRAL';
     version:        string;
+    tradeSetup:     TradeSetup;
 }
 
 export interface ScreenerResult {

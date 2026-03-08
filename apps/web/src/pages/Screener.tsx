@@ -9,7 +9,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useTheme } from '@mui/material/styles';
 import { useScreenerStore } from '../store/useScreenerStore';
-import type { ScreenerStock, SRLevel, FuturesContract } from '../api/screener';
+import type { ScreenerStock, SRLevel, FuturesContract, TradeSetup } from '../api/screener';
 import { screenerApi } from '../api/screener';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,6 +64,120 @@ function SRBar({ level, rangeMin, rangeMax }: { level: SRLevel; currentPrice: nu
             <Typography sx={{ position: 'absolute', left: `${Math.min(Math.max(pct, 2), 95)}%`, fontSize: '9px', color, fontFamily: 'monospace', whiteSpace: 'nowrap', pl: '4px' }}>
                 ₹{fmt(level.price)} {level.source === 'swing' ? `(${level.touchCount}x)` : `[${level.source}]`}
             </Typography>
+        </Box>
+    );
+}
+
+// ─── Trade Setup Panel ────────────────────────────────────────────────────────
+function TradeSetupPanel({ ts, price, compact = false }: { ts: TradeSetup; price: number; compact?: boolean }) {
+    const theme   = useTheme();
+    const isDark  = theme.palette.mode === 'dark';
+    const slColor = '#ef5350';
+    const t1Color = '#4caf50';
+    const t2Color = '#66bb6a';
+
+    // Mini visual: horizontal bar from SL to T2, current price as dot
+    const lo      = ts.stopLoss;
+    const hi      = ts.target2;
+    const range   = hi - lo || 1;
+    const curPct  = ((price     - lo) / range) * 100;
+    const t1Pct   = ((ts.target1 - lo) / range) * 100;
+
+    if (compact) {
+        return (
+            <Paper variant="outlined" sx={{ p: 1, bgcolor: 'background.default' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '9px', color: 'text.disabled', letterSpacing: '0.15em', textTransform: 'uppercase', mb: 0.75 }}>
+                    Trade Setup · R:R {ts.riskRewardRatio}:1
+                </Typography>
+
+                {/* Three columns: SL / Price / T1 / T2 */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                        <Typography sx={{ fontSize: '9px', color: 'text.secondary', fontFamily: 'monospace' }}>STOP LOSS</Typography>
+                        <Typography sx={{ fontSize: '12px', color: slColor, fontFamily: 'monospace', fontWeight: 700 }}>₹{fmt(ts.stopLoss)}</Typography>
+                        <Typography sx={{ fontSize: '9px', color: slColor, fontFamily: 'monospace' }}>−{ts.stopLossPct}%</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center' }}>
+                        <Typography sx={{ fontSize: '9px', color: 'text.secondary', fontFamily: 'monospace' }}>TARGET 1</Typography>
+                        <Typography sx={{ fontSize: '12px', color: t1Color, fontFamily: 'monospace', fontWeight: 700 }}>₹{fmt(ts.target1)}</Typography>
+                        <Typography sx={{ fontSize: '9px', color: t1Color, fontFamily: 'monospace' }}>+{ts.target1Pct}%</Typography>
+                    </Box>
+                    <Box sx={{ textAlign: 'center' }}>
+                        <Typography sx={{ fontSize: '9px', color: 'text.secondary', fontFamily: 'monospace' }}>TARGET 2</Typography>
+                        <Typography sx={{ fontSize: '12px', color: t2Color, fontFamily: 'monospace', fontWeight: 700 }}>₹{fmt(ts.target2)}</Typography>
+                        <Typography sx={{ fontSize: '9px', color: t2Color, fontFamily: 'monospace' }}>+{ts.target2Pct}%</Typography>
+                    </Box>
+                </Box>
+
+                {/* Visual range bar */}
+                <Box sx={{ position: 'relative', height: '6px', borderRadius: 3, overflow: 'visible',
+                    background: `linear-gradient(90deg, ${slColor}40 0%, ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'} 35%, ${t1Color}40 70%, ${t2Color}40 100%)` }}>
+                    {/* T1 tick */}
+                    <Box sx={{ position: 'absolute', left: `${Math.min(Math.max(t1Pct, 2), 97)}%`, top: '-3px', width: '2px', height: '12px', bgcolor: t1Color, borderRadius: 1 }} />
+                    {/* Current price dot */}
+                    <Box sx={{ position: 'absolute', left: `${Math.min(Math.max(curPct, 2), 97)}%`, top: '-4px', width: '14px', height: '14px', bgcolor: '#ffa726', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 0 6px rgba(255,167,38,0.8)' }} />
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: '3px' }}>
+                    <Typography sx={{ fontSize: '8px', color: slColor, fontFamily: 'monospace' }}>SL</Typography>
+                    <Typography sx={{ fontSize: '8px', color: '#ffa726', fontFamily: 'monospace' }}>◆ CMP</Typography>
+                    <Typography sx={{ fontSize: '8px', color: t2Color, fontFamily: 'monospace' }}>T2</Typography>
+                </Box>
+            </Paper>
+        );
+    }
+
+    // Full (modal) version
+    return (
+        <Box>
+            {/* Basis labels */}
+            <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
+                <Chip size="small" label={`SL basis: ${ts.stopLossBasis}`}
+                    sx={{ fontFamily: 'monospace', fontSize: '10px', bgcolor: `${slColor}18`, color: slColor, border: `1px solid ${slColor}40` }} />
+                <Chip size="small" label={`T1 basis: ${ts.targetBasis}`}
+                    sx={{ fontFamily: 'monospace', fontSize: '10px', bgcolor: `${t1Color}18`, color: t1Color, border: `1px solid ${t1Color}40` }} />
+            </Box>
+
+            {/* Visual range bar */}
+            <Box sx={{ mb: 1.5 }}>
+                <Box sx={{ position: 'relative', height: '10px', borderRadius: 5, overflow: 'visible',
+                    background: `linear-gradient(90deg, ${slColor}50 0%, ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'} 30%, ${t1Color}50 65%, ${t2Color}50 100%)` }}>
+                    {/* T1 tick */}
+                    <Box sx={{ position: 'absolute', left: `${Math.min(Math.max(t1Pct, 2), 97)}%`, top: '-5px', width: '2px', height: '20px', bgcolor: t1Color, borderRadius: 1 }} />
+                    {/* Current price dot */}
+                    <Box sx={{ position: 'absolute', left: `${Math.min(Math.max(curPct, 2), 97)}%`, top: '-6px', width: '22px', height: '22px', bgcolor: '#ffa726', borderRadius: '50%', transform: 'translateX(-50%)', boxShadow: '0 0 10px rgba(255,167,38,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Typography sx={{ fontSize: '9px', fontFamily: 'monospace', color: '#000', fontWeight: 900 }}>◆</Typography>
+                    </Box>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: '6px' }}>
+                    <Typography sx={{ fontSize: '9px', color: slColor, fontFamily: 'monospace' }}>SL ₹{fmt(ts.stopLoss)}</Typography>
+                    <Typography sx={{ fontSize: '9px', color: '#ffa726', fontFamily: 'monospace' }}>CMP ₹{fmt(price)}</Typography>
+                    <Typography sx={{ fontSize: '9px', color: t1Color, fontFamily: 'monospace' }}>T1 ₹{fmt(ts.target1)}</Typography>
+                    <Typography sx={{ fontSize: '9px', color: t2Color, fontFamily: 'monospace' }}>T2 ₹{fmt(ts.target2)}</Typography>
+                </Box>
+            </Box>
+
+            {/* Data grid */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1 }}>
+                {[
+                    { label: 'Stop Loss', value: `₹${fmt(ts.stopLoss)}`, sub: `−${ts.stopLossPct}%`, color: slColor },
+                    { label: 'Target 1 (T1)', value: `₹${fmt(ts.target1)}`, sub: `+${ts.target1Pct}%`, color: t1Color },
+                    { label: 'Target 2 (T2)', value: `₹${fmt(ts.target2)}`, sub: `+${ts.target2Pct}%`, color: t2Color },
+                ].map(({ label, value, sub, color }) => (
+                    <Paper key={label} variant="outlined" sx={{ p: 1, textAlign: 'center', borderColor: `${color}40` }}>
+                        <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontFamily: 'monospace', mb: '2px' }}>{label}</Typography>
+                        <Typography sx={{ fontSize: '15px', color, fontFamily: 'monospace', fontWeight: 800, lineHeight: 1.1 }}>{value}</Typography>
+                        <Typography sx={{ fontSize: '11px', color, fontFamily: 'monospace', opacity: 0.85 }}>{sub}</Typography>
+                    </Paper>
+                ))}
+            </Box>
+
+            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontFamily: 'monospace' }}>Risk:Reward</Typography>
+                <Typography sx={{ fontSize: '13px', color: ts.riskRewardRatio >= 2 ? t1Color : ts.riskRewardRatio >= 1.5 ? '#ffa726' : slColor, fontFamily: 'monospace', fontWeight: 700 }}>1 : {ts.riskRewardRatio}</Typography>
+                <Typography sx={{ fontSize: '10px', color: 'text.disabled', fontFamily: 'monospace', ml: 'auto' }}>
+                    Risk/trade: ₹{fmt(price - ts.stopLoss)} per share
+                </Typography>
+            </Box>
         </Box>
     );
 }
@@ -184,6 +298,12 @@ function DetailModal({ stock, onClose }: { stock: ScreenerStock; onClose: () => 
                         ))}
                     </Box>
                 )}
+
+                {/* Trade Setup — Target & Stop Loss */}
+                <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.2em', color: 'primary.main', textTransform: 'uppercase', mb: 1.5 }}>// Trade Setup — Stop Loss & Targets</Typography>
+                    <TradeSetupPanel ts={stock.tradeSetup} price={price} compact={false} />
+                </Box>
 
                 {/* Upcoming Futures Contracts */}
                 <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
@@ -318,6 +438,9 @@ function StockCard({ stock, onClick }: { stock: ScreenerStock; onClick: () => vo
                     <Typography sx={{ fontSize: '9px', color: 'text.disabled', fontFamily: 'monospace' }}>R</Typography>
                 </Box>
             </Paper>
+
+            {/* Trade Setup */}
+            <TradeSetupPanel ts={stock.tradeSetup} price={stock.currentPrice} compact />
 
             {/* Pivot + Trend row */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>

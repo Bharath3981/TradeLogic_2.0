@@ -769,6 +769,208 @@ export function analyzeStock(candles: Candle[], holdingMonths: number = 3): Indi
     };
 }
 
+// ─── Trade Setup (Target & Stop Loss) ────────────────────────────────────────
+
+export interface TradeSetup {
+    /** Stop loss price level */
+    stopLoss:        number;
+    /** % below current price */
+    stopLossPct:     number;
+    /** Conservative target (T1) — resistance or 2:1 R:R */
+    target1:         number;
+    /** % above current price for T1 */
+    target1Pct:      number;
+    /** Extended target (T2) — 3:1 R:R or Pivot R2 */
+    target2:         number;
+    /** % above current price for T2 */
+    target2Pct:      number;
+    /** T1 Risk:Reward ratio (e.g. 2.1 means 1:2.1) */
+    riskRewardRatio: number;
+    /** What technical basis was used to determine the stop loss */
+    stopLossBasis:   string;
+    /** What basis was used to determine T1 */
+    targetBasis:     string;
+}
+
+/**
+ * Compute an intelligent stop loss and target levels using multiple technical methods:
+ *
+ * Stop Loss — picks the TIGHTEST technically-meaningful level:
+ *   1. ATR-based        : price − (ATR × atrMult)  — baseline, always computed
+ *   2. Support-based    : nearestSupport × 0.995    — preferred if tighter than ATR SL
+ *   3. Swing-low-based  : recent 20-bar swing low × 0.997
+ *   4. EMA floor        : EMA50 (uptrend) or EMA20 as dynamic support
+ *   5. Bollinger lower  : BB lower band for mean-reversion bounces
+ *   6. Pattern low      : Hammer / Engulfing / Morning Star — SL below candle low
+ *
+ * Targets — T1 (conservative), T2 (extended):
+ *   T1 = nearest resistance if ≥ 1.5:1 R:R, else Pivot R1, else ATR extension
+ *   T2 = Pivot R2 if above T1, else T1 × ATR-extension multiplier
+ *
+ * ATR & R:R multipliers scale with holdingMonths (1M → 6M).
+ */
+export function calculateTradeSetup(
+    candles:       Candle[],
+    analysis:      IndicatorResult,
+    holdingMonths: number = 3
+): TradeSetup {
+
+    const currentPrice = candles[candles.length - 1].close;
+    const lastCandle   = candles[candles.length - 1];
+    const atr          = analysis.atr.value || currentPrice * 0.02; // fallback 2%
+    const sr           = analysis.supportResistance;
+    const pattern      = analysis.candlePattern;
+    const ema          = analysis.ema;
+    const pivots       = analysis.pivotPoints;
+    const bb           = analysis.bollingerBands;
+    const trend        = analysis.trendStrength;
+
+    // ── ATR multiplier based on holding period ────────────────────────────────
+    const atrMult = holdingMonths <= 1 ? 1.0
+                  : holdingMonths <= 2 ? 1.25
+                  : holdingMonths <= 3 ? 1.5
+                  : 2.0;
+
+    // ── 1. ATR-based SL (baseline — always computed) ─────────────────────────
+    let stopLoss = currentPrice - atr * atrMult;
+    let slBasis  = `ATR×${atrMult}`;
+
+    // ── 2. Support-based SL — prefer if tighter (closer to price = less risk) ─
+    if (sr.nearestSupport > 0 && sr.nearestSupport < currentPrice) {
+        const supportSL = sr.nearestSupport * 0.995;   // 0.5% buffer below support
+        if (supportSL > stopLoss) {
+            stopLoss = supportSL;
+            slBasis  = 'Support Level';
+        }
+    }
+
+    // ── 3. Swing-low from recent 20 candles ───────────────────────────────────
+    const recent20 = candles.slice(-20);
+    let   swingLow = 0;
+    for (let i = 2; i < recent20.length - 1; i++) {
+        const c = recent20[i];
+        if (c.low <= recent20[i - 1].low && c.low <= recent20[i + 1].low &&
+            c.low <= recent20[i - 2].low) {
+            if (c.low > swingLow) swingLow = c.low; // highest recent swing low (tightest SL)
+        }
+    }
+    if (swingLow > 0 && swingLow < currentPrice) {
+        const swingSL = swingLow * 0.997;   // 0.3% below swing low
+        if (swingSL > stopLoss) {
+            stopLoss = swingSL;
+            slBasis  = 'Recent Swing Low';
+        }
+    }
+
+    // ── 4. EMA floor — dynamic support in trending markets ────────────────────
+    if (trend.direction === 'uptrend') {
+        const ema50floor  = ema.ema50  > 0 && ema.ema50  < currentPrice ? ema.ema50  * 0.997 : 0;
+        const ema20floor  = ema.ema20  > 0 && ema.ema20  < currentPrice ? ema.ema20  * 0.997 : 0;
+        const ema200floor = ema.ema200 > 0 && ema.ema200 < currentPrice ? ema.ema200 * 0.997 : 0;
+
+        // Use EMA50 as floor for strong uptrend, EMA20 for weaker
+        const emaFloor = ema.signal === 'bullish' ? (ema50floor || ema20floor) : ema20floor;
+        if (emaFloor > stopLoss) {
+            stopLoss = emaFloor;
+            slBasis  = ema50floor && ema.signal === 'bullish' ? 'EMA50 Floor' : 'EMA20 Floor';
+        }
+        // EMA200 as absolute floor for long-term holds
+        if (holdingMonths >= 6 && ema200floor > stopLoss) {
+            stopLoss = ema200floor;
+            slBasis  = 'EMA200 Floor';
+        }
+    }
+
+    // ── 5. Bollinger lower band — for mean-reversion bounce setups ────────────
+    if (bb.lower > 0 && bb.lower < currentPrice && pattern.signal === 'bullish') {
+        const bbSL = bb.lower * 0.997;
+        if (bbSL > stopLoss) {
+            stopLoss = bbSL;
+            slBasis  = 'Bollinger Lower';
+        }
+    }
+
+    // ── 6. Candlestick pattern low — natural SL for reversal candles ─────────
+    const REVERSAL_PATTERNS = new Set([
+        'Hammer', 'Bullish Engulfing', 'Morning Star',
+        'Bullish Marubozu', 'Three White Soldiers',
+    ]);
+    if (pattern.signal === 'bullish' && REVERSAL_PATTERNS.has(pattern.pattern)) {
+        const patternSL = lastCandle.low * 0.998;   // 0.2% below candle low
+        if (patternSL > stopLoss && patternSL < currentPrice * 0.99) {
+            stopLoss = patternSL;
+            slBasis  = `${pattern.pattern} Low`;
+        }
+    }
+
+    // ── Safety clamp: SL must be 0.5% – 12% below current price ─────────────
+    stopLoss = Math.max(stopLoss, currentPrice * 0.88);    // max 12% drawdown
+    stopLoss = Math.min(stopLoss, currentPrice * 0.995);   // min 0.5% below
+
+    // ── Risk amount ───────────────────────────────────────────────────────────
+    const risk = Math.max(currentPrice - stopLoss, currentPrice * 0.001);
+
+    // ── Target multipliers by holding period ──────────────────────────────────
+    const t1Mult = holdingMonths <= 1 ? 1.5
+                 : holdingMonths <= 2 ? 2.0
+                 : holdingMonths <= 3 ? 2.0
+                 : 2.5;
+    const t2Mult = holdingMonths <= 1 ? 2.5
+                 : holdingMonths <= 2 ? 3.0
+                 : holdingMonths <= 3 ? 3.0
+                 : 4.0;
+
+    let target1     = currentPrice + risk * t1Mult;
+    let targetBasis = `${t1Mult}:1 R:R`;
+    let target2     = currentPrice + risk * t2Mult;
+
+    // ── T1: prefer resistance level if it gives ≥ 1.5:1 R:R ──────────────────
+    if (sr.nearestResistance > currentPrice) {
+        const resRR = (sr.nearestResistance - currentPrice) / risk;
+        if (resRR >= 1.5) {
+            target1     = sr.nearestResistance;
+            targetBasis = `Resistance (${resRR.toFixed(1)}:1)`;
+        }
+    }
+
+    // ── Pivot R1 as alternative T1 (if tighter than resistance but ≥ 1.5:1) ──
+    if (pivots.r1 > currentPrice) {
+        const r1RR = (pivots.r1 - currentPrice) / risk;
+        if (r1RR >= 1.5 && pivots.r1 < target1) {
+            target1     = pivots.r1;
+            targetBasis = `Pivot R1 (${r1RR.toFixed(1)}:1)`;
+        }
+    }
+
+    // ── T2: Pivot R2 if valid, else ATR extension ─────────────────────────────
+    if (pivots.r2 > target1) {
+        const r2RR = (pivots.r2 - currentPrice) / risk;
+        if (r2RR >= t2Mult * 0.75) {
+            target2 = pivots.r2;
+        }
+    }
+
+    // Guarantee T2 is always above T1 by at least 1%
+    target2 = Math.max(target2, target1 * 1.01);
+
+    const riskRewardRatio = round2((target1 - currentPrice) / risk);
+    const stopLossPct     = round2(((currentPrice - stopLoss) / currentPrice) * 100);
+    const target1Pct      = round2(((target1 - currentPrice) / currentPrice) * 100);
+    const target2Pct      = round2(((target2 - currentPrice) / currentPrice) * 100);
+
+    return {
+        stopLoss:        round2(stopLoss),
+        stopLossPct,
+        target1:         round2(target1),
+        target1Pct,
+        target2:         round2(target2),
+        target2Pct,
+        riskRewardRatio,
+        stopLossBasis:   slBasis,
+        targetBasis,
+    };
+}
+
 function emptyResult(): IndicatorResult {
     return {
         rsi:            { value: 50, signal: 'neutral' },
